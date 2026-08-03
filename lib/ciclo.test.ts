@@ -8,6 +8,8 @@ import {
   desplazarMes,
   diasEnMes,
   diasEntre,
+  sumarDias,
+  diaSemana,
   hoyISO,
 } from "./ciclo";
 
@@ -127,6 +129,28 @@ describe("diasEntre", () => {
 
   it("cruza fin de año sin error de zona horaria", () => {
     expect(diasEntre("2026-12-31", "2027-01-01")).toBe(1);
+  });
+});
+
+describe("sumarDias", () => {
+  it("suma y resta días dentro del mismo mes", () => {
+    expect(sumarDias("2026-08-10", 1)).toBe("2026-08-11");
+    expect(sumarDias("2026-08-10", -1)).toBe("2026-08-09");
+  });
+
+  it("cruza fin de mes y fin de año", () => {
+    expect(sumarDias("2026-08-31", 1)).toBe("2026-09-01");
+    expect(sumarDias("2026-01-01", -1)).toBe("2025-12-31");
+  });
+});
+
+describe("diaSemana", () => {
+  it("2026-08-03 es lunes", () => {
+    expect(diaSemana("2026-08-03")).toBe(1);
+  });
+
+  it("2026-08-02 es domingo", () => {
+    expect(diaSemana("2026-08-02")).toBe(0);
   });
 });
 

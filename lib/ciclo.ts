@@ -82,3 +82,16 @@ export function diasEntre(isoA: string, isoB: string): number {
   const b = Date.UTC(yb, mb - 1, db);
   return Math.round((b - a) / 86_400_000);
 }
+
+/** Suma (o resta, con n negativo) días a una fecha. */
+export function sumarDias(iso: string, n: number): string {
+  const { y, m, d } = partesFecha(iso);
+  const date = new Date(Date.UTC(y, m - 1, d + n));
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+}
+
+/** Día de la semana: 0 = domingo … 6 = sábado. */
+export function diaSemana(iso: string): number {
+  const { y, m, d } = partesFecha(iso);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
