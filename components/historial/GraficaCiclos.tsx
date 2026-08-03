@@ -1,11 +1,29 @@
 "use client";
 
+import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { etiquetaCiclo, etiquetaCorta } from "@/lib/labels";
 import { pesos, pesosCorto } from "@/lib/money";
 import type { ResumenCiclo } from "@/lib/historial";
 
 const colorPorTotal = (total: number, tope: number) =>
   total > tope ? "#C4544F" : total > tope * 0.8 ? "#C08A2E" : "#4E8C5A";
+
+function TooltipGrafica({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: { payload: ResumenCiclo }[];
+}) {
+  if (!active || !payload?.length) return null;
+  const r = payload[0].payload;
+  return (
+    <div className="bg-ink text-white text-xs rounded-lg px-2.5 py-1.5">
+      <div className="font-semibold">{etiquetaCiclo(r.ciclo)}</div>
+      <div className="num">{pesos(r.total)}</div>
+    </div>
+  );
+}
 
 export function GraficaCiclos({
   ventana,
@@ -16,47 +34,39 @@ export function GraficaCiclos({
   tope: number;
   onSeleccionar: (ciclo: string) => void;
 }) {
-  const maxPlot = Math.max(tope, ...ventana.map((r) => r.total), 1) * 1.12;
-  const topeY = (tope / maxPlot) * 100;
-
   return (
-    <div className="bg-surface border border-line rounded-2xl px-3.5 pt-4 pb-2.5">
-      <div className="relative flex items-end gap-1.5 h-[140px]">
-        <div className="absolute left-0 right-0 border-t-2 border-dashed border-ink/35" style={{ bottom: `${topeY}%` }} />
-        <span
-          className="absolute right-0 text-[10px] text-muted bg-surface pl-1"
-          style={{ bottom: `${topeY}%`, transform: "translateY(-14px)" }}
-        >
-          tope {pesosCorto(tope)}
-        </span>
-        {ventana.map((r) => (
-          <button
-            key={r.ciclo}
-            onClick={() => onSeleccionar(r.ciclo)}
-            aria-label={`Ciclo ${etiquetaCiclo(r.ciclo)}: ${pesos(r.total)}`}
-            className="flex-1 flex flex-col justify-end items-center h-full bg-none border-none p-0 cursor-pointer"
+    <div className="bg-surface border border-line rounded-2xl px-1 pt-4 pb-2.5">
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={ventana} margin={{ top: 16, right: 12, left: 12, bottom: 0 }} barCategoryGap="20%">
+          <XAxis
+            dataKey="ciclo"
+            tickFormatter={(ciclo: string) => etiquetaCorta(ciclo)}
+            tick={{ fontSize: 10, fill: "#6E6879" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <ReferenceLine
+            y={tope}
+            stroke="#211D2B"
+            strokeOpacity={0.35}
+            strokeWidth={2}
+            strokeDasharray="4 4"
+            label={{ value: `tope ${pesosCorto(tope)}`, position: "insideTopRight", fontSize: 10, fill: "#6E6879" }}
+          />
+          <Tooltip cursor={{ fill: "rgba(33,29,43,0.06)" }} content={<TooltipGrafica />} />
+          <Bar
+            dataKey="total"
+            radius={[5, 5, 2, 2]}
+            onClick={(data: ResumenCiclo) => onSeleccionar(data.ciclo)}
+            cursor="pointer"
+            isAnimationActive={false}
           >
-            {ventana.length <= 6 && <span className="text-[10px] text-muted mb-1 num">{pesosCorto(r.total)}</span>}
-            <span
-              className="w-full rounded-t-[5px] rounded-b-[2px]"
-              style={{
-                height: `${Math.max(2, (r.total / maxPlot) * 100)}%`,
-                backgroundColor: colorPorTotal(r.total, tope),
-                opacity: r.enCurso ? 0.55 : 1,
-                backgroundImage:
-                  "repeating-linear-gradient(115deg, rgba(255,255,255,0.2) 0 2px, transparent 2px 6px)",
-              }}
-            />
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-1.5 mt-2">
-        {ventana.map((r) => (
-          <span key={r.ciclo} className="flex-1 text-center text-[10px] text-muted">
-            {etiquetaCorta(r.ciclo)}
-          </span>
-        ))}
-      </div>
+            {ventana.map((r) => (
+              <Cell key={r.ciclo} fill={colorPorTotal(r.total, tope)} fillOpacity={r.enCurso ? 0.55 : 1} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }

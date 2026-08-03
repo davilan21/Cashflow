@@ -10,7 +10,7 @@ bus"), topes con proyección, historial por ciclo y exportación/importación.
 - **Next.js** (App Router) + **TypeScript**
 - **Supabase** — Postgres, Auth (magic link), Row Level Security
 - **Tailwind CSS**
-- **Recharts**-ready (gráficas actuales son SVG/CSS a mano; sin dependencia extra)
+- **Recharts** para la gráfica de barras del historial
 - **Anthropic API** (`@anthropic-ai/sdk`), llamada solo desde `app/api/parse/route.ts` (servidor)
 - **Vitest** para pruebas unitarias de `lib/`
 
