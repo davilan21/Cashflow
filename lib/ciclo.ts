@@ -40,6 +40,12 @@ export function desplazarMes(ym: string, delta: number): string {
   return `${nuevoY}-${pad(nuevoM)}`;
 }
 
+/** El mes calendario 'YYYY-MM' de una fecha (no confundir con el ciclo de facturación). */
+export function mesDe(fecha: string): string {
+  const { y, m } = partesFecha(fecha);
+  return `${y}-${pad(m)}`;
+}
+
 /** Número de días del mes 'YYYY-MM'. */
 export function diasEnMes(ym: string): number {
   const { y, m } = partesMes(ym);
@@ -94,4 +100,20 @@ export function sumarDias(iso: string, n: number): string {
 export function diaSemana(iso: string): number {
   const { y, m, d } = partesFecha(iso);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** Día del mes de una fecha 'YYYY-MM-DD'. */
+export function diaDe(fecha: string): number {
+  return partesFecha(fecha).d;
+}
+
+/** Mes (1-12) de un 'YYYY-MM' o 'YYYY-MM-DD'. */
+export function mesNum(fechaOMes: string): number {
+  return Number(fechaOMes.slice(5, 7));
+}
+
+/** Convierte 'YYYY-MM-DD' a un Date anclado en UTC (solo para lo que necesite un objeto Date, p.ej. getUTCDay). */
+export function aDate(fecha: string): Date {
+  const { y, m, d } = partesFecha(fecha);
+  return new Date(Date.UTC(y, m - 1, d));
 }

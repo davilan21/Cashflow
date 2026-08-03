@@ -10,6 +10,10 @@ import {
   diasEntre,
   sumarDias,
   diaSemana,
+  diaDe,
+  mesNum,
+  mesDe,
+  aDate,
   hoyISO,
 } from "./ciclo";
 
@@ -151,6 +155,22 @@ describe("diaSemana", () => {
 
   it("2026-08-02 es domingo", () => {
     expect(diaSemana("2026-08-02")).toBe(0);
+  });
+});
+
+describe("diaDe / mesNum / mesDe / aDate", () => {
+  it("extraen las partes de una fecha o de un ciclo 'YYYY-MM'", () => {
+    expect(diaDe("2026-08-15")).toBe(15);
+    expect(mesNum("2026-08")).toBe(8);
+    expect(mesNum("2026-08-15")).toBe(8);
+    expect(mesDe("2026-08-15")).toBe("2026-08");
+  });
+
+  it("aDate ancla en UTC, sin corrimiento de zona horaria", () => {
+    const d = aDate("2026-08-15");
+    expect(d.getUTCFullYear()).toBe(2026);
+    expect(d.getUTCMonth()).toBe(7);
+    expect(d.getUTCDate()).toBe(15);
   });
 });
 
