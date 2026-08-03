@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { listarGastos, listarCategorias, obtenerSettings, actualizarTopes } from "@/lib/supabase/queries";
 import { useGastos } from "@/hooks/useGastos";
@@ -57,8 +58,13 @@ export function RegistroClient({
   const [settings, setSettings] = useState(settingsIniciales);
   const [cargandoReintento, setCargandoReintento] = useState(false);
 
-  const [ciclo, setCiclo] = useState(cicloDe(hoyISO()));
-  const [vista, setVista] = useState<Vista>(mitadDe(hoyISO()) === 1 ? "m1" : "m2");
+  const searchParams = useSearchParams();
+  const cicloUrl = searchParams.get("ciclo");
+  const vistaUrl = searchParams.get("vista");
+  const [ciclo, setCiclo] = useState(cicloUrl && /^\d{4}-\d{2}$/.test(cicloUrl) ? cicloUrl : cicloDe(hoyISO()));
+  const [vista, setVista] = useState<Vista>(
+    vistaUrl === "m1" || vistaUrl === "m2" || vistaUrl === "ciclo" ? vistaUrl : mitadDe(hoyISO()) === 1 ? "m1" : "m2"
+  );
   const [texto, setTexto] = useState("");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");

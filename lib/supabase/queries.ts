@@ -60,6 +60,23 @@ export async function eliminarGasto(supabase: Cliente, id: string): Promise<{ er
   return { error };
 }
 
+export async function crearGastosMasivo(
+  supabase: Cliente,
+  userId: string,
+  gastos: NuevoGasto[]
+): Promise<Resultado<Expense[]>> {
+  const { data, error } = await sinTipar(supabase)
+    .from("expenses")
+    .insert(gastos.map((g) => ({ ...g, user_id: userId })))
+    .select();
+  return { data: data as Expense[] | null, error };
+}
+
+export async function eliminarTodosLosGastos(supabase: Cliente, userId: string): Promise<{ error: PostgrestError | null }> {
+  const { error } = await sinTipar(supabase).from("expenses").delete().eq("user_id", userId);
+  return { error };
+}
+
 export async function actualizarTopes(
   supabase: Cliente,
   userId: string,
