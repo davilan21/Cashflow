@@ -30,10 +30,11 @@ const ordenarPorFecha = (gastos: Expense[]) => [...gastos].sort((a, b) => b.fech
 export function useGastos(opts: {
   supabase: SupabaseClient<Database>;
   userId: string;
+  cuentaId: string;
   iniciales: Expense[];
   lecturaFallida: boolean;
 }) {
-  const { supabase, userId, iniciales, lecturaFallida } = opts;
+  const { supabase, userId, cuentaId, iniciales, lecturaFallida } = opts;
   const [gastos, setGastos] = useState<Expense[]>(iniciales);
   const [bloqueado, setBloqueado] = useState(lecturaFallida);
   const [guardadoError, setGuardadoError] = useState(false);
@@ -41,7 +42,7 @@ export function useGastos(opts: {
   const ejecutarOperacion = useCallback(
     async (op: OperacionPendiente): Promise<boolean> => {
       if (op.tipo === "crear") {
-        const { data, error } = await crearGasto(supabase, userId, op.gasto);
+        const { data, error } = await crearGasto(supabase, cuentaId, op.gasto);
         if (error || !data) return false;
         setGastos((prev) => ordenarPorFecha(prev.map((g) => (g.id === op.idTemporal ? data : g))));
         return true;
@@ -55,7 +56,7 @@ export function useGastos(opts: {
       const { error } = await eliminarGasto(supabase, op.id);
       return !error;
     },
-    [supabase, userId]
+    [supabase, cuentaId]
   );
 
   const cola = useOfflineQueue<OperacionPendiente>({
@@ -70,11 +71,12 @@ export function useGastos(opts: {
       const ahora = new Date().toISOString();
       const optimista: Expense = {
         id: idTemporal,
-        user_id: userId,
+        cuenta_id: cuentaId,
         fecha: gasto.fecha,
         monto: gasto.monto,
         categoria: gasto.categoria,
         nota: gasto.nota,
+        created_by: userId,
         created_at: ahora,
         updated_at: ahora,
       };
@@ -85,7 +87,7 @@ export function useGastos(opts: {
         return;
       }
       try {
-        const { data, error } = await crearGasto(supabase, userId, gasto);
+        const { data, error } = await crearGasto(supabase, cuentaId, gasto);
         if (error || !data) throw error ?? new Error("sin datos");
         setGastos((prev) => ordenarPorFecha(prev.map((g) => (g.id === idTemporal ? data : g))));
         setGuardadoError(false);
@@ -98,7 +100,7 @@ export function useGastos(opts: {
         }
       }
     },
-    [supabase, userId, cola]
+    [supabase, userId, cuentaId, cola]
   );
 
   const editar = useCallback(

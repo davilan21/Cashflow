@@ -11,6 +11,7 @@ export function ListaMovimientos({
   vista,
   catById,
   pendientesIds,
+  autorDe,
   onEditar,
   onEliminar,
 }: {
@@ -18,6 +19,7 @@ export function ListaMovimientos({
   vista: Vista;
   catById: (id: string) => Category;
   pendientesIds: Set<string>;
+  autorDe?: (createdBy: string | null) => string | null;
   onEditar: (g: Expense) => void;
   onEliminar: (id: string) => void;
 }) {
@@ -53,6 +55,7 @@ export function ListaMovimientos({
                 gasto={g}
                 categoria={catById(g.categoria)}
                 pendiente={pendientesIds.has(g.id)}
+                autor={autorDe?.(g.created_by) ?? null}
                 onEditar={() => onEditar(g)}
                 onEliminar={() => onEliminar(g.id)}
               />

@@ -5,12 +5,14 @@ export function ItemGasto({
   gasto,
   categoria,
   pendiente,
+  autor,
   onEditar,
   onEliminar,
 }: {
   gasto: Expense;
   categoria: Category;
   pendiente: boolean;
+  autor?: string | null;
   onEditar: () => void;
   onEliminar: () => void;
 }) {
@@ -23,7 +25,10 @@ export function ItemGasto({
         aria-label={`Editar ${gasto.nota || categoria.nombre}`}
       >
         <span className="block text-sm truncate">{gasto.nota || categoria.nombre}</span>
-        <span className="block text-[11px] text-muted mt-0.5">{categoria.nombre}</span>
+        <span className="block text-[11px] text-muted mt-0.5">
+          {categoria.nombre}
+          {autor && <span className="text-[#8A7FA6]"> · {autor}</span>}
+        </span>
       </button>
       {pendiente && (
         <span className="text-[10px] text-muted border border-line rounded-full px-1.5 py-0.5 shrink-0">pendiente</span>

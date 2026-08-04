@@ -3,7 +3,7 @@ import { armarJSON, armarCSV } from "./export";
 import type { Expense, Settings } from "./types";
 
 const settings: Settings = {
-  user_id: "u1",
+  cuenta_id: "c1",
   tope_ciclo: 4_000_000,
   tope_quincena: 2_000_000,
   dia_corte: 15,
@@ -13,11 +13,12 @@ const settings: Settings = {
 
 const gasto = (over: Partial<Expense>): Expense => ({
   id: "id-1",
-  user_id: "u1",
+  cuenta_id: "c1",
   fecha: "2026-08-01",
   monto: 200000,
   categoria: "restaurantes",
   nota: "almuerzo",
+  created_by: "u1",
   created_at: "",
   updated_at: "",
   ...over,

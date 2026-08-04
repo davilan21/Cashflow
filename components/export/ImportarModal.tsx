@@ -8,10 +8,12 @@ import { pesos } from "@/lib/money";
 
 export function ImportarModal({
   categoriasValidas,
+  compartida = false,
   onImportar,
   onCerrar,
 }: {
   categoriasValidas: Set<string>;
+  compartida?: boolean;
   onImportar: (datos: ImportacionParseada, modo: "combinar" | "reemplazar") => void;
   onCerrar: () => void;
 }) {
@@ -19,6 +21,7 @@ export function ImportarModal({
   const [datos, setDatos] = useState<ImportacionParseada | null>(null);
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [confirmandoReemplazo, setConfirmandoReemplazo] = useState(false);
 
   const analizar = (t: string) => {
     setTexto(t);
@@ -39,6 +42,12 @@ export function ImportarModal({
 
   const confirmar = async (modo: "combinar" | "reemplazar") => {
     if (!datos || enviando) return;
+    // En cuenta compartida, "Reemplazar" borra los gastos de TODOS los miembros:
+    // exigimos una segunda confirmación explícita.
+    if (modo === "reemplazar" && compartida && !confirmandoReemplazo) {
+      setConfirmandoReemplazo(true);
+      return;
+    }
     setEnviando(true);
     await onImportar(datos, modo);
   };
@@ -64,6 +73,13 @@ export function ImportarModal({
         </p>
       )}
 
+      {confirmandoReemplazo && (
+        <p className="text-alerta text-[13px] mt-3 leading-relaxed">
+          Ojo: esta cuenta es compartida. <b>Reemplazar borra TODOS los gastos de la cuenta</b>, incluidos los de
+          los demás miembros. Toca “Reemplazar” de nuevo para confirmar.
+        </p>
+      )}
+
       <div className="flex gap-2 mt-4">
         <Button onClick={onCerrar} disabled={enviando}>
           Cancelar
@@ -72,7 +88,7 @@ export function ImportarModal({
           Combinar
         </Button>
         <Button variant="primary" disabled={!datos || enviando} onClick={() => confirmar("reemplazar")}>
-          Reemplazar
+          {confirmandoReemplazo ? "Sí, reemplazar todo" : "Reemplazar"}
         </Button>
       </div>
     </Modal>

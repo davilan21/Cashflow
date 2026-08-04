@@ -29,19 +29,21 @@ import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 
-const CATEGORIA_VACIA: Category = { id: "otros", nombre: "Otros", color: "#6B6F76", orden: 99, user_id: null };
+const CATEGORIA_VACIA: Category = { id: "otros", nombre: "Otros", color: "#6B6F76", orden: 99, cuenta_id: null };
 
 export function HistorialClient({
-  userId,
+  cuentaId,
   gastosIniciales,
   categorias: categoriasIniciales,
   settingsIniciales,
+  esCompartida,
   lecturaFallida,
 }: {
-  userId: string;
+  cuentaId: string;
   gastosIniciales: Expense[];
   categorias: Category[];
   settingsIniciales: Settings;
+  esCompartida: boolean;
   lecturaFallida: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -61,9 +63,9 @@ export function HistorialClient({
   const reintentar = async () => {
     setCargandoReintento(true);
     const [gastosRes, categoriasRes, settingsRes] = await Promise.all([
-      listarGastos(supabase, userId),
+      listarGastos(supabase),
       listarCategorias(supabase),
-      obtenerSettings(supabase, userId),
+      obtenerSettings(supabase),
     ]);
     setCargandoReintento(false);
     if (gastosRes.error || categoriasRes.error || settingsRes.error) return;
@@ -90,7 +92,7 @@ export function HistorialClient({
     const candidatos = modo === "combinar" ? filtrarNuevos(gastos, datos.gastos) : datos.gastos;
 
     if (modo === "reemplazar") {
-      const { error: errBorrar } = await eliminarTodosLosGastos(supabase, userId);
+      const { error: errBorrar } = await eliminarTodosLosGastos(supabase, cuentaId);
       if (errBorrar) {
         setImportando(false);
         mostrarToast("No se pudo reemplazar el registro");
@@ -99,7 +101,7 @@ export function HistorialClient({
     }
 
     const { data: nuevos, error } = candidatos.length
-      ? await crearGastosMasivo(supabase, userId, candidatos)
+      ? await crearGastosMasivo(supabase, cuentaId, candidatos)
       : { data: [] as Expense[], error: null };
 
     if (error) {
@@ -111,7 +113,7 @@ export function HistorialClient({
     const nt = datos.tope ?? settings.tope_ciclo;
     const ntq = datos.topeQ ?? settings.tope_quincena;
     if (datos.tope || datos.topeQ) {
-      await actualizarTopes(supabase, userId, { tope_ciclo: nt, tope_quincena: ntq });
+      await actualizarTopes(supabase, cuentaId, { tope_ciclo: nt, tope_quincena: ntq });
     }
 
     setGastos((prev) => (modo === "reemplazar" ? nuevos ?? [] : [...prev, ...(nuevos ?? [])]));
@@ -184,6 +186,7 @@ export function HistorialClient({
       {importando && (
         <ImportarModal
           categoriasValidas={new Set(categorias.map((c) => c.id))}
+          compartida={esCompartida}
           onImportar={importar}
           onCerrar={() => setImportando(false)}
         />

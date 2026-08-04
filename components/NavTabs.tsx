@@ -3,29 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+const TABS = [
+  { href: "/registro", label: "Registro" },
+  { href: "/historial", label: "Historial" },
+  { href: "/cuenta", label: "Cuenta" },
+] as const;
+
 export function NavTabs() {
   const pathname = usePathname();
-  const enHistorial = pathname.startsWith("/historial");
 
   return (
     <div className="flex items-center gap-2 mb-4">
       <div className="flex gap-1 bg-[#E4DFEC] p-[3px] rounded-xl flex-1">
-        <Link
-          href="/registro"
-          className={`flex-1 text-center py-2 rounded-lg text-sm ${
-            !enHistorial ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted"
-          }`}
-        >
-          Registro
-        </Link>
-        <Link
-          href="/historial"
-          className={`flex-1 text-center py-2 rounded-lg text-sm ${
-            enHistorial ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted"
-          }`}
-        >
-          Historial
-        </Link>
+        {TABS.map((t) => {
+          const activo = pathname.startsWith(t.href);
+          return (
+            <Link
+              key={t.href}
+              href={t.href}
+              className={`flex-1 text-center py-2 rounded-lg text-sm ${
+                activo ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
       </div>
       <form action="/auth/signout" method="post">
         <button

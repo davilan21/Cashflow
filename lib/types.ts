@@ -14,11 +14,11 @@ export interface Category {
   nombre: string;
   color: string;
   orden: number;
-  user_id: string | null;
+  cuenta_id: string | null;
 }
 
 export interface Settings {
-  user_id: string;
+  cuenta_id: string;
   tope_ciclo: number;
   tope_quincena: number;
   dia_corte: number;
@@ -28,11 +28,12 @@ export interface Settings {
 
 export interface Expense {
   id: string;
-  user_id: string;
+  cuenta_id: string;
   fecha: string; // 'YYYY-MM-DD'
   monto: number;
   categoria: string;
   nota: string | null;
+  created_by: string | null; // quién lo registró (atribución)
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,22 @@ export interface NuevoGasto {
   monto: number;
   categoria: string;
   nota: string;
+}
+
+/** Una cuenta compartida (hogar). */
+export interface Cuenta {
+  id: string;
+  join_code: string | null;
+  join_expira: string | null;
+  created_at: string;
+}
+
+/** Un miembro de una cuenta. */
+export interface Miembro {
+  cuenta_id: string;
+  user_id: string;
+  apodo: string | null;
+  joined_at: string;
 }
 
 /**
@@ -59,21 +76,23 @@ export interface Database {
         Row: Expense;
         Insert: {
           id?: string;
-          user_id: string;
+          cuenta_id: string;
           fecha: string;
           monto: number;
           categoria: string;
           nota?: string | null;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          cuenta_id?: string;
           fecha?: string;
           monto?: number;
           categoria?: string;
           nota?: string | null;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -82,7 +101,7 @@ export interface Database {
       settings: {
         Row: Settings;
         Insert: {
-          user_id: string;
+          cuenta_id: string;
           tope_ciclo?: number;
           tope_quincena?: number;
           dia_corte?: number;
@@ -90,7 +109,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
-          user_id?: string;
+          cuenta_id?: string;
           tope_ciclo?: number;
           tope_quincena?: number;
           dia_corte?: number;
@@ -106,19 +125,56 @@ export interface Database {
           nombre: string;
           color: string;
           orden: number;
-          user_id?: string | null;
+          cuenta_id?: string | null;
         };
         Update: {
           id?: string;
           nombre?: string;
           color?: string;
           orden?: number;
-          user_id?: string | null;
+          cuenta_id?: string | null;
+        };
+        Relationships: [];
+      };
+      cuentas: {
+        Row: Cuenta;
+        Insert: {
+          id?: string;
+          join_code?: string | null;
+          join_expira?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          join_code?: string | null;
+          join_expira?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      cuenta_miembros: {
+        Row: Miembro;
+        Insert: {
+          cuenta_id: string;
+          user_id: string;
+          apodo?: string | null;
+          joined_at?: string;
+        };
+        Update: {
+          cuenta_id?: string;
+          user_id?: string;
+          apodo?: string | null;
+          joined_at?: string;
         };
         Relationships: [];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      mi_cuenta: { Args: Record<string, never>; Returns: string };
+      generar_codigo: { Args: Record<string, never>; Returns: string };
+      unirse_a_cuenta: { Args: { codigo: string }; Returns: string };
+      set_apodo: { Args: { nombre: string }; Returns: undefined };
+    };
   };
 }

@@ -8,7 +8,7 @@ import { useGastos } from "@/hooks/useGastos";
 import { useToast } from "@/hooks/useToast";
 import { cicloDe, cicloInicio, cicloFin, mitadDe, desplazarMes, diasEnMes, diasEntre, mesNum, hoyISO } from "@/lib/ciclo";
 import { pesos } from "@/lib/money";
-import type { Category, Expense, NuevoGasto, Settings } from "@/lib/types";
+import type { Category, Expense, Miembro, NuevoGasto, Settings } from "@/lib/types";
 
 import { CicloHeader } from "./CicloHeader";
 import { TopeCard } from "./TopeCard";
@@ -23,20 +23,24 @@ import { TopeQuincena } from "./TopeQuincena";
 import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
 
-const CATEGORIA_VACIA: Category = { id: "otros", nombre: "Otros", color: "#6B6F76", orden: 99, user_id: null };
+const CATEGORIA_VACIA: Category = { id: "otros", nombre: "Otros", color: "#6B6F76", orden: 99, cuenta_id: null };
 const CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 export function RegistroClient({
   userId,
+  cuentaId,
   gastosIniciales,
   categorias: categoriasIniciales,
   settingsIniciales,
+  miembros,
   lecturaFallida,
 }: {
   userId: string;
+  cuentaId: string;
   gastosIniciales: Expense[];
   categorias: Category[];
   settingsIniciales: Settings;
+  miembros: Miembro[];
   lecturaFallida: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -51,8 +55,18 @@ export function RegistroClient({
     pendientesIds,
     hayPendientes,
     online,
-  } = useGastos({ supabase, userId, iniciales: gastosIniciales, lecturaFallida });
+  } = useGastos({ supabase, userId, cuentaId, iniciales: gastosIniciales, lecturaFallida });
   const { mensaje, mostrar } = useToast();
+
+  // Atribución: mapear created_by -> nombre a mostrar. Solo tiene sentido cuando
+  // hay 2+ miembros en la cuenta; con una sola persona no mostramos nada.
+  const mostrarAutor = miembros.length >= 2;
+  const autorDe = (createdBy: string | null): string | null => {
+    if (!mostrarAutor || !createdBy) return null;
+    if (createdBy === userId) return "tú";
+    const m = miembros.find((x) => x.user_id === createdBy);
+    return m?.apodo?.trim() || "otra persona";
+  };
 
   const [categorias, setCategorias] = useState(categoriasIniciales);
   const [settings, setSettings] = useState(settingsIniciales);
@@ -77,9 +91,9 @@ export function RegistroClient({
   const reintentar = async () => {
     setCargandoReintento(true);
     const [gastosRes, categoriasRes, settingsRes] = await Promise.all([
-      listarGastos(supabase, userId),
+      listarGastos(supabase),
       listarCategorias(supabase),
-      obtenerSettings(supabase, userId),
+      obtenerSettings(supabase),
     ]);
     setCargandoReintento(false);
     if (gastosRes.error || categoriasRes.error || settingsRes.error) return;
@@ -157,7 +171,7 @@ export function RegistroClient({
     const anterior = settings;
     setSettings((s) => ({ ...s, tope_ciclo: topeCiclo, tope_quincena: topeQuincena }));
     setEditandoTopes(false);
-    const { data, error: err } = await actualizarTopes(supabase, userId, {
+    const { data, error: err } = await actualizarTopes(supabase, cuentaId, {
       tope_ciclo: topeCiclo,
       tope_quincena: topeQuincena,
     });
@@ -250,6 +264,7 @@ export function RegistroClient({
             vista={vista}
             catById={catById}
             pendientesIds={pendientesIds}
+            autorDe={autorDe}
             onEditar={setEditando}
             onEliminar={eliminar}
           />

@@ -52,11 +52,12 @@ describe("parsearImportacion", () => {
 describe("filtrarNuevos", () => {
   const existente: Expense = {
     id: "x",
-    user_id: "u1",
+    cuenta_id: "c1",
     fecha: "2026-08-01",
     monto: 200000,
     categoria: "restaurantes",
     nota: "almuerzo",
+    created_by: "u1",
     created_at: "",
     updated_at: "",
   };
