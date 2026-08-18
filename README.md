@@ -97,6 +97,38 @@ por quincena) — edítalos desde el botón "topes" en la pantalla de Registro.
    la URL de producción de Vercel (y su `/auth/callback`) está en la lista de
    redirects — si no, el magic link fallará silenciosamente en producción.
 
+## 6. Conectar Gmail (lectura automática de gastos)
+
+1. Crea un proyecto en [Google Cloud Console](https://console.cloud.google.com/).
+2. **APIs y servicios → Biblioteca**: activa la **Gmail API**.
+3. **APIs y servicios → Pantalla de consentimiento OAuth**:
+   - Tipo de usuario: **Externo**.
+   - Deja el estado en **Pruebas** (no publiques la app: el scope de Gmail
+     es "restringido" y publicar exigiría una auditoría de seguridad
+     anual de pago, inconveniente para una app personal).
+   - En **Usuarios de prueba**, agrega tu correo de Gmail (hasta 100).
+   - Nota: en modo Pruebas, el token de acceso expira cada ~7 días — la
+     app te avisará con un botón de "Reconectar" cuando pase.
+4. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente
+   de OAuth**:
+   - Tipo de aplicación: **Aplicación web**.
+   - **URI de redireccionamiento autorizados**: agrega
+     `http://localhost:3000/api/gmail/oauth/callback` y
+     `https://tu-app.vercel.app/api/gmail/oauth/callback` (tu dominio de
+     producción).
+   - Copia el **ID de cliente** y el **Secreto de cliente**.
+5. En tus variables de entorno (`.env.local` y en Vercel para producción):
+
+```
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
+CRON_SECRET=una-cadena-aleatoria-larga
+```
+
+`CRON_SECRET` la generas tú (por ejemplo `openssl rand -hex 32`) — protege
+la ruta que dispara la sincronización diaria para que solo Vercel Cron
+pueda llamarla.
+
 ## Migrar datos de una versión anterior (el prototipo)
 
 En **Historial → Respaldo**, usa **Importar JSON** y pega un archivo con
