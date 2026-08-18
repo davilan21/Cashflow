@@ -62,6 +62,31 @@ export interface Miembro {
   joined_at: string;
 }
 
+/** Conexión de Gmail de un usuario (solo accesible con service role). */
+export interface GmailConexion {
+  user_id: string;
+  email_conectado: string;
+  refresh_token: string;
+  estado: "activo" | "expirado" | "error";
+  ultimo_sync_at: string | null;
+  ultimo_error: string | null;
+  created_at: string;
+}
+
+/** Un gasto detectado en Gmail, pendiente de revisión. */
+export interface GastoPendiente {
+  id: string;
+  cuenta_id: string;
+  creado_por: string;
+  gmail_message_id: string;
+  fecha: string;
+  monto: number;
+  categoria: string;
+  nota: string;
+  estado: "pendiente" | "confirmado" | "descartado";
+  created_at: string;
+}
+
 /**
  * Nota: Insert/Update van como literales de objeto inline (no como referencia
  * a un `interface` aparte). Con @supabase/postgrest-js 2.x, cuando Insert/Update
@@ -168,6 +193,49 @@ export interface Database {
         };
         Relationships: [];
       };
+      gmail_conexiones: {
+        Row: GmailConexion;
+        Insert: {
+          user_id: string;
+          email_conectado: string;
+          refresh_token: string;
+          estado?: string;
+          ultimo_sync_at?: string | null;
+          ultimo_error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          email_conectado?: string;
+          refresh_token?: string;
+          estado?: string;
+          ultimo_sync_at?: string | null;
+          ultimo_error?: string | null;
+        };
+        Relationships: [];
+      };
+      gastos_pendientes: {
+        Row: GastoPendiente;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          creado_por: string;
+          gmail_message_id: string;
+          fecha: string;
+          monto: number;
+          categoria: string;
+          nota: string;
+          estado?: string;
+          created_at?: string;
+        };
+        Update: {
+          estado?: string;
+          monto?: number;
+          categoria?: string;
+          nota?: string;
+          fecha?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -175,6 +243,7 @@ export interface Database {
       generar_codigo: { Args: Record<string, never>; Returns: string };
       unirse_a_cuenta: { Args: { codigo: string }; Returns: string };
       set_apodo: { Args: { nombre: string }; Returns: undefined };
+      confirmar_gasto_pendiente: { Args: { p_id: string; p_monto: number; p_categoria: string; p_nota: string; p_fecha: string }; Returns: string };
     };
   };
 }
