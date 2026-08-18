@@ -670,30 +670,35 @@ export async function parsearNotificacionConClaude(texto: string): Promise<Gasto
 }
 ```
 
-- [ ] **Paso 6: Verificar manualmente**
+- [ ] **Paso 6: Test del camino sin API key + verificación de tipos**
 
-```bash
-npx tsc --noEmit
+El único comportamiento de `parsearNotificacionConClaude` que se puede
+probar sin gastar una llamada real a la API es el fallback seguro cuando
+no hay `ANTHROPIC_API_KEY` — igual que su equivalente en `/api/parse`.
+Agrega este test a `lib/gmail/parse.test.ts` (no requiere mockear
+`fetch`/Anthropic porque la función retorna antes de construir el
+cliente):
+
+```typescript
+import { parsearNotificacionConClaude } from "./parse";
+
+describe("parsearNotificacionConClaude", () => {
+  it("sin ANTHROPIC_API_KEY, devuelve null sin llamar a la API", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    expect(await parsearNotificacionConClaude("cualquier texto")).toBeNull();
+    vi.unstubAllEnvs();
+  });
+});
 ```
 
-Si **no** tienes `ANTHROPIC_API_KEY` configurada todavía (caso normal en
-este punto del desarrollo), confirma el comportamiento seguro por defecto
-con un script rápido:
+Run: `npx vitest run lib/gmail/parse.test.ts && npx tsc --noEmit`
+Expected: PASS, sin errores de tipos.
 
-```bash
-node -e "
-require('dotenv').config({ path: '.env.local' });
-delete process.env.ANTHROPIC_API_KEY;
-require('tsx/cjs');
-const { parsearNotificacionConClaude } = require('./lib/gmail/parse.ts');
-parsearNotificacionConClaude('cualquier texto').then(r => console.log('resultado:', r));
-"
-```
-
-Expected: `resultado: null` (cae al parser local, igual que `/api/parse`).
-Si ya tienes `ANTHROPIC_API_KEY` configurada, puedes correrlo sin el
-`delete` y confirmar que devuelve `{monto, fecha, nota, categoria}` con
-datos razonables para el texto de ejemplo de la Tarea 5, Paso 1.
+El caso "con API key real" (respuesta correcta de Claude para el texto de
+ejemplo) se verifica en la Tarea 15 dentro del flujo end-to-end completo,
+donde de todas formas hace falta una `ANTHROPIC_API_KEY` real para probar
+algo con sentido — un test aislado que la requiriera sería lento, no
+determinístico y gastaría cuota de la API en cada corrida de `npm test`.
 
 - [ ] **Paso 7: Commit**
 
@@ -1318,6 +1323,7 @@ export async function GET(request: Request) {
 
 ```typescript
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sinTipar } from "@/lib/supabase/queries";
@@ -1346,12 +1352,8 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", request.url));
 
-  const cookieGuardado = request.headers
-    .get("cookie")
-    ?.split(";")
-    .map((c) => c.trim())
-    .find((c) => c.startsWith("gmail_oauth_state="))
-    ?.split("=")[1];
+  const cookieStore = await cookies();
+  const cookieGuardado = cookieStore.get("gmail_oauth_state")?.value;
 
   if (!code || !state || !cookieGuardado || state !== cookieGuardado) return irACuenta(request, "error");
 
