@@ -14,7 +14,7 @@ type Resultado<T> = { data: T | null; error: PostgrestError | null };
  * validated at the boundary by NuevoGasto/Partial<NuevoGasto> instead, with
  * Postgres (NOT NULL, checks, RLS) enforcing the rest at runtime.
  */
-function sinTipar(supabase: Cliente): SupabaseClient {
+export function sinTipar(supabase: Cliente): SupabaseClient {
   return supabase as unknown as SupabaseClient;
 }
 
