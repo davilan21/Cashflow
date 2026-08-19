@@ -80,7 +80,7 @@ export async function sincronizarGmail(
     await sinTipar(admin)
       .from("gmail_conexiones")
       .update({
-        estado: "activo",
+        estado: fallidos > 0 ? "error" : "activo",
         ultimo_sync_at: new Date().toISOString(),
         ultimo_error: fallidos > 0 ? `${fallidos} correo(s) no se pudieron guardar` : null,
       })
