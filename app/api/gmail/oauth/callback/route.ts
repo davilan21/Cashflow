@@ -22,18 +22,18 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(new URL("/login", request.url));
-
-  const cookieStore = await cookies();
-  const cookieGuardado = cookieStore.get("gmail_oauth_state")?.value;
-
-  if (!code || !state || !cookieGuardado || state !== cookieGuardado) return irACuenta(request, "error");
-
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return NextResponse.redirect(new URL("/login", request.url));
+
+    const cookieStore = await cookies();
+    const cookieGuardado = cookieStore.get("gmail_oauth_state")?.value;
+
+    if (!code || !state || !cookieGuardado || state !== cookieGuardado) return irACuenta(request, "error");
+
     const redirectUri = new URL("/api/gmail/oauth/callback", request.url).toString();
     const tokens = await intercambiarCodigo(code, redirectUri);
     if (!tokens.refresh_token) return irACuenta(request, "error");
