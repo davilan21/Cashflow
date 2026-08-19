@@ -9,7 +9,11 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Si CRON_SECRET no está configurado, la comparación contra
+  // `Bearer undefined` dejaría pasar a cualquiera que mande ese literal:
+  // se falla cerrado cuando falta el secreto.
+  const secreto = process.env.CRON_SECRET;
+  if (!secreto || auth !== `Bearer ${secreto}`) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

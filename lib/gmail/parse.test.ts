@@ -1,5 +1,20 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { extraerTextoPlano, parsearNotificacionLocal, parsearNotificacionConClaude } from "./parse";
+
+// vi.mock se iza sobre los imports, así que el mock compartido se crea con
+// vi.hoisted para poder configurarlo desde cada test.
+const { crearMensaje } = vi.hoisted(() => ({ crearMensaje: vi.fn() }));
+
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: class {
+    messages = { create: crearMensaje };
+  },
+}));
+
+/** Respuesta de la API con una llamada a registrar_gasto_bancario. */
+function respuestaHerramienta(input: Record<string, unknown>) {
+  return { content: [{ type: "tool_use", name: "registrar_gasto_bancario", input }] };
+}
 
 function base64Url(texto: string): string {
   return Buffer.from(texto, "utf-8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -64,9 +79,51 @@ describe("parsearNotificacionLocal", () => {
 });
 
 describe("parsearNotificacionConClaude", () => {
+  beforeEach(() => {
+    crearMensaje.mockReset();
+  });
+
   it("sin ANTHROPIC_API_KEY, devuelve null sin llamar a la API", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     expect(await parsearNotificacionConClaude("cualquier texto")).toBeNull();
+    expect(crearMensaje).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
+  it("si Claude marca es_gasto = false, devuelve null (no es una compra)", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    crearMensaje.mockResolvedValue(
+      respuestaHerramienta({
+        es_gasto: false,
+        monto: 250000,
+        comercio: "Transferencia recibida",
+        fecha: "2026-08-17",
+        categoria: "otros",
+      })
+    );
+    // Aunque el monto sea válido, un correo que no es gasto no debe producir
+    // un pendiente: evita ensuciar la bandeja de revisión.
+    expect(await parsearNotificacionConClaude("Recibiste una transferencia por $250.000")).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("si Claude marca es_gasto = true, devuelve el gasto detectado", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    crearMensaje.mockResolvedValue(
+      respuestaHerramienta({
+        es_gasto: true,
+        monto: 172860,
+        comercio: "CLARO SOLUCIONES",
+        fecha: "2026-08-17",
+        categoria: "suscripciones",
+      })
+    );
+    expect(await parsearNotificacionConClaude(TEXTO_NOTIFICACION)).toEqual({
+      monto: 172860,
+      fecha: "2026-08-17",
+      nota: "CLARO SOLUCIONES",
+      categoria: "suscripciones",
+    });
     vi.unstubAllEnvs();
   });
 });

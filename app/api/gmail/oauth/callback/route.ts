@@ -4,10 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sinTipar } from "@/lib/supabase/queries";
 import { intercambiarCodigo, obtenerEmailConectado } from "@/lib/gmail/oauth";
-import { sincronizarGmail } from "@/lib/gmail/sync";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 30;
 
 function irACuenta(request: Request, estado: string) {
   const destino = new URL("/cuenta", request.url);
@@ -47,7 +46,9 @@ export async function GET(request: Request) {
         { onConflict: "user_id" }
       );
 
-    await sincronizarGmail(admin, user.id);
+    // El primer sync (con backfill de 30 días) lo dispara el usuario desde
+    // el botón "Sincronizar ahora" en Pendientes, o el cron diario — correrlo
+    // aquí arriesgaba un timeout de la función si había muchos correos.
     return irACuenta(request, "conectado");
   } catch {
     return irACuenta(request, "error");

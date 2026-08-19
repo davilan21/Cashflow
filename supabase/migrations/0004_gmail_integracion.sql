@@ -71,8 +71,9 @@ create trigger gastos_pendientes_bloquear_confirmacion
 -- atómica y marca el pendiente como confirmado. SECURITY DEFINER porque
 -- valida pertenencia con mi_cuenta() y hace dos escrituras relacionadas;
 -- auth.uid() sigue siendo el del llamador (no cambia con SECURITY DEFINER),
--- así que created_by en expenses lo sigue fijando el trigger existente
--- set_created_by().
+-- así que el trigger existente set_created_by() fija created_by = quien
+-- confirma; se corrige justo después del insert para atribuir el gasto a
+-- quien conectó el Gmail (creado_por del pendiente).
 create or replace function confirmar_gasto_pendiente(
   p_id uuid, p_monto bigint, p_categoria text, p_nota text, p_fecha date
 )
@@ -84,12 +85,13 @@ as $$
 declare
   v_cuenta uuid;
   v_estado text;
+  v_creado_por uuid;
   v_nuevo_id uuid;
 begin
   -- "for update" bloquea la fila hasta el commit: evita que dos llamadas
   -- concurrentes con el mismo p_id lean ambas estado = 'pendiente' antes de
   -- que cualquiera confirme, lo que duplicaría el gasto en expenses.
-  select cuenta_id, estado into v_cuenta, v_estado from gastos_pendientes where id = p_id for update;
+  select cuenta_id, estado, creado_por into v_cuenta, v_estado, v_creado_por from gastos_pendientes where id = p_id for update;
   -- "is distinct from" es NULL-safe: si el llamador no tiene fila en
   -- cuenta_miembros, mi_cuenta() es NULL y "v_cuenta <> mi_cuenta()" daría
   -- NULL (que PL/pgSQL trata como false en un IF), dejando pasar la
@@ -105,6 +107,11 @@ begin
   insert into expenses (cuenta_id, fecha, monto, categoria, nota)
     values (v_cuenta, p_fecha, p_monto, p_categoria, p_nota)
     returning id into v_nuevo_id;
+
+  -- El trigger expenses_set_created_by fija created_by = auth.uid() (quien
+  -- confirma) en el insert; lo corregimos aquí para que quede atribuido a
+  -- quien conectó el Gmail de donde salió el gasto, no a quien lo revisó.
+  update expenses set created_by = v_creado_por where id = v_nuevo_id;
 
   -- Variable de sesión local a la transacción (is_local = true): le indica
   -- al trigger bloquear_confirmacion_directa() que esta transición a

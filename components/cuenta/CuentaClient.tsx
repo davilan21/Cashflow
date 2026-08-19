@@ -201,6 +201,10 @@ export function CuentaClient({
             </p>
             {estadoConexionGmail.estado === "expirado" ? (
               <p className="text-[13px] text-alerta mb-2.5">Tu conexión expiró, reconéctala.</p>
+            ) : estadoConexionGmail.estado === "error" ? (
+              <p className="text-[13px] text-alerta mb-2.5">
+                {estadoConexionGmail.ultimoError ?? "La última sincronización falló."}
+              </p>
             ) : (
               <p className="text-[13px] text-muted mb-2.5">Revisa los gastos detectados en la pestaña Pendientes.</p>
             )}

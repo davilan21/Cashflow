@@ -34,14 +34,23 @@ export function PendientesClient({
     setSincronizando(true);
     try {
       const res = await fetch("/api/gmail/sync", { method: "POST" });
-      if (!res.ok) throw new Error();
-      const data: { nuevos: number } = await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const mensajes: Record<string, string> = {
+          expirado: "Tu conexión a Gmail expiró — reconéctala",
+          sin_conexion: "No tienes Gmail conectado",
+          sin_cuenta: "No se pudo sincronizar: tu cuenta no está lista",
+          sync_fallo: "No se pudo sincronizar, intenta de nuevo",
+        };
+        mostrar(mensajes[data.error] ?? "No se pudo sincronizar");
+        return;
+      }
       mostrar(data.nuevos > 0 ? `${data.nuevos} gasto(s) nuevo(s)` : "Sin novedades");
-      router.refresh();
     } catch {
       mostrar("No se pudo sincronizar");
     } finally {
       setSincronizando(false);
+      router.refresh();
     }
   };
 
@@ -87,6 +96,12 @@ export function PendientesClient({
       {estadoConexion.conectado && estadoConexion.estado === "expirado" && (
         <Banner accion={{ etiqueta: "Reconectar", onClick: () => (window.location.href = "/api/gmail/oauth/start") }}>
           Tu conexión a Gmail expiró. Reconéctala para seguir detectando gastos.
+        </Banner>
+      )}
+
+      {estadoConexion.conectado && estadoConexion.estado === "error" && (
+        <Banner accion={{ etiqueta: "Reintentar", onClick: sincronizar }}>
+          {estadoConexion.ultimoError ?? "La última sincronización falló."}
         </Banner>
       )}
 

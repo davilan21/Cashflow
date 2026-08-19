@@ -50,6 +50,7 @@ export async function sincronizarGmail(
   try {
     const ids = await listarIdsMensajes(accessToken, query);
     let nuevos = 0;
+    let fallidos = 0;
 
     for (const id of ids) {
       const mensaje = await obtenerMensaje(accessToken, id);
@@ -66,15 +67,23 @@ export async function sincronizarGmail(
         categoria: detectado.categoria,
         nota: detectado.nota,
       });
-      if (!error) nuevos++;
-      // error.code === "23505" (unique(creado_por, gmail_message_id)) significa que ya
-      // se había procesado este correo; cualquier otro error también se ignora para no
-      // abortar el resto del sync por un solo mensaje problemático.
+      if (!error) {
+        nuevos++;
+        continue;
+      }
+      // 23505 = unique(creado_por, gmail_message_id): ya se había procesado este
+      // correo, es el dedupe esperado. Cualquier otro error se cuenta para
+      // avisar en ultimo_error, en vez de perderse en silencio.
+      if (error.code !== "23505") fallidos++;
     }
 
     await sinTipar(admin)
       .from("gmail_conexiones")
-      .update({ estado: "activo", ultimo_sync_at: new Date().toISOString(), ultimo_error: null })
+      .update({
+        estado: "activo",
+        ultimo_sync_at: new Date().toISOString(),
+        ultimo_error: fallidos > 0 ? `${fallidos} correo(s) no se pudieron guardar` : null,
+      })
       .eq("user_id", userId);
 
     return { nuevos };

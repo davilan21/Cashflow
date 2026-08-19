@@ -81,16 +81,21 @@ const CATEGORIAS_VALIDAS = [
 
 const HERRAMIENTA: Anthropic.Tool = {
   name: "registrar_gasto_bancario",
-  description: "Registra el gasto extraído de una notificación de Bancolombia.",
+  description: "Registra el gasto extraído de una notificación de Bancolombia, si de verdad es un gasto.",
   input_schema: {
     type: "object",
     properties: {
+      es_gasto: {
+        type: "boolean",
+        description:
+          "true solo si el correo es una compra o pago con tarjeta de crédito que reduce el saldo disponible. false para transferencias recibidas, consultas de saldo, alertas de acceso u otro tipo de notificación que no sea un gasto.",
+      },
       monto: { type: "number", description: "Monto en pesos colombianos, sin decimales" },
       comercio: { type: "string", description: "Comercio o concepto del pago, corto y limpio, sin 'Ref' ni números de referencia" },
       fecha: { type: "string", description: "Fecha en formato YYYY-MM-DD" },
       categoria: { type: "string", enum: CATEGORIAS_VALIDAS as unknown as string[] },
     },
-    required: ["monto", "comercio", "fecha", "categoria"],
+    required: ["es_gasto", "monto", "comercio", "fecha", "categoria"],
   },
 };
 
@@ -104,7 +109,7 @@ export async function parsearNotificacionConClaude(texto: string): Promise<Gasto
       model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
       system:
-        "Extraes el gasto de una notificación de Bancolombia (compra, pago de factura, etc.) y siempre respondes llamando a la herramienta registrar_gasto_bancario. fecha en YYYY-MM-DD. comercio: nombre corto y limpio del establecimiento o concepto. categoria debe ser uno de los ids permitidos; si no calza con ninguno, usa 'otros'.",
+        "Extraes el gasto de una notificación de Bancolombia (compra, pago de factura, etc.) y siempre respondes llamando a la herramienta registrar_gasto_bancario. Primero decide es_gasto: false si el correo NO es una compra o pago con tarjeta (por ejemplo: transferencia recibida, consulta de saldo, alerta de acceso, notificación informativa sin monto debitado). fecha en YYYY-MM-DD. comercio: nombre corto y limpio del establecimiento o concepto. categoria debe ser uno de los ids permitidos; si no calza con ninguno, usa 'otros'.",
       tools: [HERRAMIENTA],
       tool_choice: { type: "tool", name: "registrar_gasto_bancario" },
       messages: [{ role: "user", content: texto }],
@@ -112,7 +117,14 @@ export async function parsearNotificacionConClaude(texto: string): Promise<Gasto
 
     const bloque = respuesta.content.find((b) => b.type === "tool_use");
     if (!bloque || bloque.type !== "tool_use") return null;
-    const input = bloque.input as { monto?: number; comercio?: string; fecha?: string; categoria?: string };
+    const input = bloque.input as {
+      es_gasto?: boolean;
+      monto?: number;
+      comercio?: string;
+      fecha?: string;
+      categoria?: string;
+    };
+    if (!input.es_gasto) return null;
     if (!(Number(input.monto) > 0)) return null;
 
     return {
