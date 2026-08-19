@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { listarMiembros, obtenerCuenta } from "@/lib/supabase/queries";
+import { obtenerEstadoConexion } from "@/lib/gmail/status";
 import { CuentaClient } from "@/components/cuenta/CuentaClient";
 
 export default async function CuentaPage() {
@@ -10,7 +12,11 @@ export default async function CuentaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [miembrosRes, cuentaRes] = await Promise.all([listarMiembros(supabase), obtenerCuenta(supabase)]);
+  const [miembrosRes, cuentaRes, estadoConexionGmail] = await Promise.all([
+    listarMiembros(supabase),
+    obtenerCuenta(supabase),
+    obtenerEstadoConexion(createAdminClient(), user.id),
+  ]);
 
   const lecturaFallida = Boolean(miembrosRes.error || cuentaRes.error);
 
@@ -20,6 +26,7 @@ export default async function CuentaPage() {
       miembros={lecturaFallida ? [] : miembrosRes.data ?? []}
       cuenta={lecturaFallida ? null : cuentaRes.data}
       lecturaFallida={lecturaFallida}
+      estadoConexionGmail={estadoConexionGmail}
     />
   );
 }
