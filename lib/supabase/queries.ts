@@ -1,5 +1,5 @@
 import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
-import type { Database, Category, Cuenta, Expense, Miembro, NuevoGasto, Settings } from "@/lib/types";
+import type { Database, Category, Cuenta, Expense, GastoPendiente, Miembro, NuevoGasto, Settings } from "@/lib/types";
 
 type Cliente = SupabaseClient<Database>;
 type Resultado<T> = { data: T | null; error: PostgrestError | null };
@@ -130,5 +130,38 @@ export async function unirseACuenta(supabase: Cliente, codigo: string): Promise<
 
 export async function setApodo(supabase: Cliente, nombre: string): Promise<{ error: PostgrestError | null }> {
   const { error } = await sinTipar(supabase).rpc("set_apodo", { nombre });
+  return { error };
+}
+
+export async function listarGastosPendientes(supabase: Cliente): Promise<Resultado<GastoPendiente[]>> {
+  const { data, error } = await supabase
+    .from("gastos_pendientes")
+    .select("*")
+    .eq("estado", "pendiente")
+    .order("fecha", { ascending: false });
+  return { data: data as GastoPendiente[] | null, error };
+}
+
+export async function actualizarGastoPendiente(
+  supabase: Cliente,
+  id: string,
+  cambios: { estado: "descartado" }
+): Promise<{ error: PostgrestError | null }> {
+  const { error } = await sinTipar(supabase).from("gastos_pendientes").update(cambios).eq("id", id);
+  return { error };
+}
+
+export async function confirmarGastoPendiente(
+  supabase: Cliente,
+  id: string,
+  cambios: { monto: number; categoria: string; nota: string; fecha: string }
+): Promise<{ error: PostgrestError | null }> {
+  const { error } = await sinTipar(supabase).rpc("confirmar_gasto_pendiente", {
+    p_id: id,
+    p_monto: cambios.monto,
+    p_categoria: cambios.categoria,
+    p_nota: cambios.nota,
+    p_fecha: cambios.fecha,
+  });
   return { error };
 }
