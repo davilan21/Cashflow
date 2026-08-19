@@ -204,10 +204,11 @@ export function CuentaClient({
             ) : (
               <p className="text-[13px] text-muted mb-2.5">Revisa los gastos detectados en la pestaña Pendientes.</p>
             )}
-            <a href="/api/gmail/oauth/start">
-              <Button className="!flex-none px-4">
-                {estadoConexionGmail.estado === "expirado" ? "Reconectar Gmail" : "Reconectar"}
-              </Button>
+            <a
+              href="/api/gmail/oauth/start"
+              className="inline-flex items-center justify-center text-center no-underline flex-1 min-h-[44px] px-3 py-2.5 rounded-lg font-sans text-sm cursor-pointer border bg-surface text-ink border-line !flex-none px-4"
+            >
+              {estadoConexionGmail.estado === "expirado" ? "Reconectar Gmail" : "Reconectar"}
             </a>
           </>
         ) : (
@@ -216,10 +217,11 @@ export function CuentaClient({
               Conecta tu Gmail para detectar automáticamente tus compras con tarjeta de crédito de Bancolombia. Los
               gastos detectados quedan en una bandeja de revisión — nada se guarda sin que lo confirmes.
             </p>
-            <a href="/api/gmail/oauth/start">
-              <Button variant="primary" className="!flex-none px-4">
-                Conectar Gmail
-              </Button>
+            <a
+              href="/api/gmail/oauth/start"
+              className="inline-flex items-center justify-center text-center no-underline flex-1 min-h-[44px] px-3 py-2.5 rounded-lg font-sans text-sm cursor-pointer border bg-ink text-white border-ink font-medium !flex-none px-4"
+            >
+              Conectar Gmail
             </a>
           </>
         )}
