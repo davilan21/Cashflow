@@ -50,13 +50,22 @@ export function extraerTextoPlano(payload: ParteGmail | undefined): string {
   return "";
 }
 
-// Calibrado contra el único formato de notificación confirmado por David:
-// "Bancolombia informa <descripción> por $<monto> desde TC*<4 dígitos>. <fecha>."
-// Si Bancolombia usa una estructura distinta para otro tipo de movimiento
-// (ej. "Compra" con el comercio después del monto), este regex no la
-// reconocerá y esa notificación no producirá un pendiente — parsearNotificacionConClaude,
-// el parser primario, es más tolerante a variaciones de formato.
+// Bancolombia manda notificaciones de tarjeta desde al menos dos remitentes
+// con formatos distintos, confirmados leyendo correos reales de David:
+//
+// 1) alertasynotificaciones@bancolombia.com.co — pagos programados:
+//    "Bancolombia informa <descripción> por $<monto> desde TC*<4 dígitos>. <fecha>."
+// 2) alertasynotificaciones@an.notificacionesbancolombia.com — compras normales,
+//    con al menos dos variantes de orden dentro del mismo correo:
+//    "...Compraste COP<monto> en <comercio> con tu T.Cred *<4 dígitos>, el <fecha> a las <hora>."
+//    "...Compraste COP<monto> en <comercio>, el <fecha> a las <hora>. Esta compra esta asociada a T.Cred *<4 dígitos>."
+//
+// Si Bancolombia usa una tercera estructura no cubierta aquí, este regex no
+// la reconocerá y esa notificación no producirá un pendiente —
+// parsearNotificacionConClaude, el parser primario, es más tolerante a
+// variaciones de formato.
 const REGEX_NOTIFICACION = /Bancolombia informa (.+?) por \$([\d.,]+) desde TC\*\d{4}\.\s*(\d{2})\/(\d{2})\/(\d{4})/;
+const REGEX_COMPRA = /Compraste COP([\d.,]+) en ([^,]+?)(?:,| con)[\s\S]*?el (\d{2})\/(\d{2})\/(\d{4})/;
 
 function limpiarMonto(texto: string): number {
   return Math.round(parseFloat(texto.replace(/\./g, "").replace(",", ".")));
@@ -67,12 +76,23 @@ function limpiarDescripcion(desc: string): string {
 }
 
 export function parsearNotificacionLocal(texto: string): GastoDetectado | null {
-  const match = REGEX_NOTIFICACION.exec(texto);
-  if (!match) return null;
-  const [, descripcion, montoTexto, dd, mm, yyyy] = match;
-  const monto = limpiarMonto(montoTexto);
-  if (!(monto > 0)) return null;
-  return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota: limpiarDescripcion(descripcion), categoria: "otros" };
+  const notificacion = REGEX_NOTIFICACION.exec(texto);
+  if (notificacion) {
+    const [, descripcion, montoTexto, dd, mm, yyyy] = notificacion;
+    const monto = limpiarMonto(montoTexto);
+    if (!(monto > 0)) return null;
+    return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota: limpiarDescripcion(descripcion), categoria: "otros" };
+  }
+
+  const compra = REGEX_COMPRA.exec(texto);
+  if (compra) {
+    const [, montoTexto, comercio, dd, mm, yyyy] = compra;
+    const monto = limpiarMonto(montoTexto);
+    if (!(monto > 0)) return null;
+    return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota: limpiarDescripcion(comercio), categoria: "otros" };
+  }
+
+  return null;
 }
 
 const CATEGORIAS_VALIDAS = [

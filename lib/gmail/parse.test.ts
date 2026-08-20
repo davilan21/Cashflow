@@ -76,6 +76,36 @@ describe("parsearNotificacionLocal", () => {
   it("devuelve null si el texto no matchea el formato esperado", () => {
     expect(parsearNotificacionLocal("Un correo cualquiera sin el formato de Bancolombia")).toBeNull();
   });
+
+  // Correos reales del remitente alertasynotificaciones@an.notificacionesbancolombia.com
+  // (compras normales, distinto del remitente de pagos programados de arriba).
+  it("compra con 'con tu T.Cred' antes de la coma y la fecha", () => {
+    const texto =
+      "¡Listo! Todo salió bien con tus movimientos Bancolombia: Compraste COP31.050,00 en CITY PARKING PLAZA U con tu T.Cred *0459, el 20/08/2026 a las 15:16. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987.";
+    expect(parsearNotificacionLocal(texto)).toEqual({
+      monto: 31050,
+      fecha: "2026-08-20",
+      nota: "CITY PARKING PLAZA U",
+      categoria: "otros",
+    });
+  });
+
+  it("compra sin tarjeta antes de la coma — el T.Cred aparece después, en otra frase", () => {
+    const texto =
+      "¡Listo! Todo salió bien con tus movimientos Bancolombia: Compraste COP16.100,00 en GOPASS, el 15/08/2026 a las 19:16. Esta compra esta asociada a T.Cred *0459. Si tienes dudas, encuentranos aqui: 01800931987.";
+    expect(parsearNotificacionLocal(texto)).toEqual({
+      monto: 16100,
+      fecha: "2026-08-15",
+      nota: "GOPASS",
+      categoria: "otros",
+    });
+  });
+
+  it("un recordatorio de factura por pagar (no un gasto todavía) no matchea ningún patrón", () => {
+    const texto =
+      "¡Te interesa! Tenemos novedades. Buenas noticias: La factura que inscribiste CLARO MOVIL COM con referencia 5456442922 está lista para que la pagues. Vence el 26/08/2026. Si activaste el pago automático, lo haremos en la fecha programada.";
+    expect(parsearNotificacionLocal(texto)).toBeNull();
+  });
 });
 
 describe("parsearNotificacionConClaude", () => {

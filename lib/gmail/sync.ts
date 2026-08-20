@@ -5,7 +5,12 @@ import { refrescarToken } from "./oauth";
 import { listarIdsMensajes, obtenerMensaje } from "./gmailApi";
 import { extraerTextoPlano, parsearNotificacionConClaude, parsearNotificacionLocal } from "./parse";
 
-const REMITENTE_BANCOLOMBIA = "alertasynotificaciones@bancolombia.com.co";
+// Bancolombia manda notificaciones de tarjeta desde al menos estos dos
+// remitentes (confirmado leyendo correos reales): uno para pagos programados,
+// otro para compras normales del día a día — este segundo es, en la práctica,
+// el que produce el volumen real (ver lib/gmail/parse.ts para el detalle de
+// formato de cada uno).
+const REMITENTES_BANCOLOMBIA = ["alertasynotificaciones@bancolombia.com.co", "alertasynotificaciones@an.notificacionesbancolombia.com"];
 const DIAS_BACKFILL = 30;
 
 /** Punto de corte para buscar correos: la última sync, o N días atrás si nunca ha sincronizado. */
@@ -45,7 +50,8 @@ export async function sincronizarGmail(
   if (!miembro) return { error: "sin_cuenta" };
 
   const desde = calcularDesde(conexion.ultimo_sync_at, DIAS_BACKFILL);
-  const query = `from:${REMITENTE_BANCOLOMBIA} after:${Math.floor(desde.getTime() / 1000)}`;
+  const remitentes = REMITENTES_BANCOLOMBIA.map((r) => `from:${r}`).join(" OR ");
+  const query = `(${remitentes}) after:${Math.floor(desde.getTime() / 1000)}`;
 
   try {
     const ids = await listarIdsMensajes(accessToken, query);
