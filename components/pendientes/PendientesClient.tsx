@@ -122,7 +122,10 @@ export function PendientesClient({
             {estadoConexion.emailConectado}
             <br />
             {estadoConexion.ultimoSyncAt
-              ? `Última sync: ${new Date(estadoConexion.ultimoSyncAt).toLocaleString("es-CO")}`
+              ? // timeZone explícito: sin esto, el servidor (UTC) y el navegador
+                // (hora local) arman textos distintos para el mismo timestamp y
+                // React tira un mismatch de hidratación (error #418) al montar.
+                `Última sync: ${new Date(estadoConexion.ultimoSyncAt).toLocaleString("es-CO", { timeZone: "America/Bogota" })}`
               : "Todavía no sincroniza"}
           </div>
           <Button className="!flex-none px-4" onClick={sincronizar} disabled={sincronizando}>
