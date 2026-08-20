@@ -1,6 +1,21 @@
 import { pesos, pesosCorto } from "@/lib/money";
 import { BarraTope } from "@/components/ui/BarraTope";
 
+interface ProyeccionQuincena {
+  etiqueta: string;
+  empezada: boolean;
+  proyeccion: number;
+  restantes: number;
+}
+
+function lineaQuincena(q: ProyeccionQuincena, topeQuincena: number) {
+  if (!q.empezada) return `${q.etiqueta}: aún no empieza.`;
+  const excedidaQ = q.proyeccion > topeQuincena;
+  return excedidaQ
+    ? `${q.etiqueta}: a este ritmo cierra en ${pesos(q.proyeccion)} — ${pesos(q.proyeccion - topeQuincena)} por encima.`
+    : `${q.etiqueta}: a este ritmo cierra en ${pesos(q.proyeccion)}.`;
+}
+
 export function TopeCard({
   total,
   tope,
@@ -9,6 +24,8 @@ export function TopeCard({
   esCicloActual,
   restantes,
   proyeccion,
+  quincena1,
+  quincena2,
 }: {
   total: number;
   tope: number;
@@ -17,6 +34,8 @@ export function TopeCard({
   esCicloActual: boolean;
   restantes: number;
   proyeccion: number;
+  quincena1: ProyeccionQuincena;
+  quincena2: ProyeccionQuincena;
 }) {
   const pct = Math.min(100, (total / tope) * 100);
   const excedido = proyeccion > tope;
@@ -45,12 +64,16 @@ export function TopeCard({
 
       {esCicloActual && total > 0 && (
         <div
-          className="mt-2.5 px-2.5 py-2 rounded-lg text-[13px] leading-relaxed"
+          className="mt-2.5 px-2.5 py-2 rounded-lg text-[13px] leading-relaxed flex flex-col gap-1"
           style={{ background: excedido ? "#FBEEED" : "#EEF4EF", color: excedido ? "#8E3733" : "#3A6644" }}
         >
-          {excedido
-            ? `A este ritmo el corte cierra en ${pesos(proyeccion)} — ${pesos(proyeccion - tope)} por encima. Faltan ${restantes} días y quedan ${pesos(Math.max(0, tope - total))}.`
-            : `A este ritmo el corte cierra en ${pesos(proyeccion)}. Faltan ${restantes} días: puedes gastar ${pesos((tope - total) / Math.max(1, restantes))} por día.`}
+          <div>{lineaQuincena(quincena1, topeQuincena)}</div>
+          <div>{lineaQuincena(quincena2, topeQuincena)}</div>
+          <div>
+            {excedido
+              ? `Ciclo completo: ${pesos(proyeccion)} — ${pesos(proyeccion - tope)} por encima. Faltan ${restantes} días y quedan ${pesos(Math.max(0, tope - total))}.`
+              : `Ciclo completo: ${pesos(proyeccion)}. Faltan ${restantes} días: puedes gastar ${pesos((tope - total) / Math.max(1, restantes))} por día.`}
+          </div>
         </div>
       )}
     </div>

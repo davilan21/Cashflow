@@ -80,6 +80,17 @@ export function mitadDe(fecha: string): 1 | 2 {
   return partesFecha(fecha).d >= 16 ? 1 : 2;
 }
 
+/** Último día de la primera mitad del ciclo (16 al fin del mes anterior al de cierre). */
+export function mitad1Fin(ciclo: string): string {
+  const mesPrev = desplazarMes(ciclo, -1);
+  return `${mesPrev}-${pad(diasEnMes(mesPrev))}`;
+}
+
+/** Primer día de la segunda mitad del ciclo (el 1 del mes de cierre). */
+export function mitad2Inicio(ciclo: string): string {
+  return `${ciclo}-01`;
+}
+
 /** Diferencia en días (isoB - isoA), positiva si isoB es posterior. */
 export function diasEntre(isoA: string, isoB: string): number {
   const { y: ya, m: ma, d: da } = partesFecha(isoA);
@@ -87,6 +98,18 @@ export function diasEntre(isoA: string, isoB: string): number {
   const a = Date.UTC(ya, ma - 1, da);
   const b = Date.UTC(yb, mb - 1, db);
   return Math.round((b - a) / 86_400_000);
+}
+
+/**
+ * Días transcurridos dentro de [inicio, fin] evaluados en `hoy`, con tope en
+ * el largo del rango: 0 si `hoy` es anterior al rango, el largo completo si
+ * es posterior o igual al fin. Sirve para proyectar gasto de una quincena
+ * específica igual que ya se hace para el ciclo completo.
+ */
+export function diasCorridosEnRango(inicio: string, fin: string, hoy: string): number {
+  if (hoy < inicio) return 0;
+  if (hoy >= fin) return diasEntre(inicio, fin) + 1;
+  return diasEntre(inicio, hoy) + 1;
 }
 
 /** Suma (o resta, con n negativo) días a una fecha. */

@@ -6,7 +6,20 @@ import { createClient } from "@/lib/supabase/client";
 import { listarGastos, listarCategorias, obtenerSettings, actualizarTopes } from "@/lib/supabase/queries";
 import { useGastos } from "@/hooks/useGastos";
 import { useToast } from "@/hooks/useToast";
-import { cicloDe, cicloInicio, cicloFin, mitadDe, desplazarMes, diasEnMes, diasEntre, mesNum, hoyISO } from "@/lib/ciclo";
+import {
+  cicloDe,
+  cicloInicio,
+  cicloFin,
+  mitadDe,
+  mitad1Fin,
+  mitad2Inicio,
+  diasCorridosEnRango,
+  desplazarMes,
+  diasEnMes,
+  diasEntre,
+  mesNum,
+  hoyISO,
+} from "@/lib/ciclo";
 import { pesos } from "@/lib/money";
 import type { Category, Expense, Miembro, NuevoGasto, Settings } from "@/lib/types";
 
@@ -125,6 +138,32 @@ export function RegistroClient({
   const restantes = Math.max(0, largo - corridos);
   const proyeccion = corridos > 0 ? (total / corridos) * largo : 0;
 
+  const etiquetaM1 = `16–${diasEnMes(mesPrev)} ${CORTOS[mesNum(mesPrev) - 1]}`;
+  const etiquetaM2 = `1–15 ${CORTOS[mesNum(ciclo) - 1]}`;
+
+  // Proyección por quincena, igual que la del ciclo completo pero acotada a
+  // cada mitad — para la alerta de "a este ritmo" discriminada por quincena.
+  const inicioM1 = cicloInicio(ciclo);
+  const finM1 = mitad1Fin(ciclo);
+  const inicioM2 = mitad2Inicio(ciclo);
+  const finM2 = cicloFin(ciclo);
+  const largoM1 = diasEntre(inicioM1, finM1) + 1;
+  const largoM2 = diasEntre(inicioM2, finM2) + 1;
+  const corridosM1 = esCicloActual ? diasCorridosEnRango(inicioM1, finM1, hoy) : largoM1;
+  const corridosM2 = esCicloActual ? diasCorridosEnRango(inicioM2, finM2, hoy) : largoM2;
+  const quincena1 = {
+    etiqueta: etiquetaM1,
+    empezada: corridosM1 > 0,
+    proyeccion: corridosM1 > 0 ? (totalM1 / corridosM1) * largoM1 : 0,
+    restantes: Math.max(0, largoM1 - corridosM1),
+  };
+  const quincena2 = {
+    etiqueta: etiquetaM2,
+    empezada: corridosM2 > 0,
+    proyeccion: corridosM2 > 0 ? (totalM2 / corridosM2) * largoM2 : 0,
+    restantes: Math.max(0, largoM2 - corridosM2),
+  };
+
   const porCategoria = useMemo(() => {
     const mapa = new Map<string, number>();
     visibles.forEach((g) => mapa.set(g.categoria, (mapa.get(g.categoria) ?? 0) + g.monto));
@@ -219,6 +258,8 @@ export function RegistroClient({
         esCicloActual={esCicloActual}
         restantes={restantes}
         proyeccion={proyeccion}
+        quincena1={quincena1}
+        quincena2={quincena2}
       />
 
       <EntradaTexto
@@ -233,8 +274,8 @@ export function RegistroClient({
       <Tabs
         vista={vista}
         onCambiar={setVista}
-        etiquetaM1={`16–${diasEnMes(mesPrev)} ${CORTOS[mesNum(mesPrev) - 1]}`}
-        etiquetaM2={`1–15 ${CORTOS[mesNum(ciclo) - 1]}`}
+        etiquetaM1={etiquetaM1}
+        etiquetaM2={etiquetaM2}
         totalM1={totalM1}
         totalM2={totalM2}
         total={total}

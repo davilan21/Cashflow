@@ -5,6 +5,9 @@ import {
   cicloFin,
   cicloPago,
   mitadDe,
+  mitad1Fin,
+  mitad2Inicio,
+  diasCorridosEnRango,
   desplazarMes,
   diasEnMes,
   diasEntre,
@@ -85,6 +88,41 @@ describe("mitadDe", () => {
   it("día <= 15 es la segunda mitad (2)", () => {
     expect(mitadDe("2026-08-15")).toBe(2);
     expect(mitadDe("2026-08-01")).toBe(2);
+  });
+});
+
+describe("mitad1Fin / mitad2Inicio", () => {
+  it("mitad1Fin es el último día del mes anterior al de cierre", () => {
+    expect(mitad1Fin("2026-08")).toBe("2026-07-31");
+    expect(mitad1Fin("2026-03")).toBe("2026-02-28");
+  });
+
+  it("mitad2Inicio es el 1 del mes de cierre", () => {
+    expect(mitad2Inicio("2026-08")).toBe("2026-08-01");
+  });
+
+  it("las dos mitades cubren el ciclo completo sin huecos ni solapes", () => {
+    const ciclo = "2026-08";
+    expect(cicloInicio(ciclo)).toBe("2026-07-16");
+    expect(mitad1Fin(ciclo)).toBe("2026-07-31");
+    expect(mitad2Inicio(ciclo)).toBe("2026-08-01");
+    expect(cicloFin(ciclo)).toBe("2026-08-15");
+  });
+});
+
+describe("diasCorridosEnRango", () => {
+  it("0 si hoy es anterior al rango", () => {
+    expect(diasCorridosEnRango("2026-08-01", "2026-08-15", "2026-07-20")).toBe(0);
+  });
+
+  it("el largo completo del rango si hoy es posterior o igual al fin", () => {
+    expect(diasCorridosEnRango("2026-08-01", "2026-08-15", "2026-08-20")).toBe(15);
+    expect(diasCorridosEnRango("2026-08-01", "2026-08-15", "2026-08-15")).toBe(15);
+  });
+
+  it("los días entre inicio y hoy (inclusive) si hoy cae dentro del rango", () => {
+    expect(diasCorridosEnRango("2026-08-01", "2026-08-15", "2026-08-01")).toBe(1);
+    expect(diasCorridosEnRango("2026-08-01", "2026-08-15", "2026-08-05")).toBe(5);
   });
 });
 
