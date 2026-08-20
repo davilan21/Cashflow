@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { generarCodigo, unirseACuenta, setApodo } from "@/lib/supabase/queries";
 import { useToast } from "@/hooks/useToast";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
 import type { Cuenta, Miembro } from "@/lib/types";
+import type { EstadoConexionGmail } from "@/lib/gmail/status";
 
 function vigente(cuenta: Cuenta | null): boolean {
   return Boolean(cuenta?.join_code && cuenta.join_expira && new Date(cuenta.join_expira) > new Date());
@@ -19,15 +20,24 @@ export function CuentaClient({
   miembros,
   cuenta,
   lecturaFallida,
+  estadoConexionGmail,
 }: {
   userId: string;
   miembros: Miembro[];
   cuenta: Cuenta | null;
   lecturaFallida: boolean;
+  estadoConexionGmail: EstadoConexionGmail;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { mensaje, mostrar } = useToast();
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const gmail = searchParams.get("gmail");
+    if (gmail === "conectado") mostrar("Gmail conectado");
+    if (gmail === "error") mostrar("No se pudo conectar Gmail, intenta de nuevo");
+  }, [searchParams, mostrar]);
 
   const miApodo = miembros.find((m) => m.user_id === userId)?.apodo ?? "";
   const [apodo, setApodoInput] = useState(miApodo);
@@ -179,6 +189,46 @@ export function CuentaClient({
             {generando ? "Generando…" : codigo ? "Generar otro" : "Generar código"}
           </Button>
         </div>
+      </section>
+
+      {/* Gmail */}
+      <section className="bg-surface border border-line rounded-2xl px-4 py-4 mb-3">
+        <div className="text-[11px] tracking-wider uppercase text-muted font-semibold mb-2">Gmail</div>
+        {estadoConexionGmail.conectado ? (
+          <>
+            <p className="text-[13px] text-ink mb-1">
+              Conectado como <strong>{estadoConexionGmail.emailConectado}</strong>
+            </p>
+            {estadoConexionGmail.estado === "expirado" ? (
+              <p className="text-[13px] text-alerta mb-2.5">Tu conexión expiró, reconéctala.</p>
+            ) : estadoConexionGmail.estado === "error" ? (
+              <p className="text-[13px] text-alerta mb-2.5">
+                {estadoConexionGmail.ultimoError ?? "La última sincronización falló."}
+              </p>
+            ) : (
+              <p className="text-[13px] text-muted mb-2.5">Revisa los gastos detectados en la pestaña Pendientes.</p>
+            )}
+            <a
+              href="/api/gmail/oauth/start"
+              className="inline-flex items-center justify-center text-center no-underline flex-1 min-h-[44px] px-3 py-2.5 rounded-lg font-sans text-sm cursor-pointer border bg-surface text-ink border-line !flex-none px-4"
+            >
+              {estadoConexionGmail.estado === "expirado" ? "Reconectar Gmail" : "Reconectar"}
+            </a>
+          </>
+        ) : (
+          <>
+            <p className="text-[13px] text-muted mb-2.5 leading-relaxed">
+              Conecta tu Gmail para detectar automáticamente tus compras con tarjeta de crédito de Bancolombia. Los
+              gastos detectados quedan en una bandeja de revisión — nada se guarda sin que lo confirmes.
+            </p>
+            <a
+              href="/api/gmail/oauth/start"
+              className="inline-flex items-center justify-center text-center no-underline flex-1 min-h-[44px] px-3 py-2.5 rounded-lg font-sans text-sm cursor-pointer border bg-ink text-white border-ink font-medium !flex-none px-4"
+            >
+              Conectar Gmail
+            </a>
+          </>
+        )}
       </section>
 
       {/* Unirse */}

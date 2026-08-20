@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/registro", label: "Registro" },
+  { href: "/pendientes", label: "Pendientes" },
   { href: "/historial", label: "Historial" },
   { href: "/cuenta", label: "Cuenta" },
 ] as const;
 
-export function NavTabs() {
+export function NavTabs({ pendientesCount = 0 }: { pendientesCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -26,6 +27,11 @@ export function NavTabs() {
               }`}
             >
               {t.label}
+              {t.href === "/pendientes" && pendientesCount > 0 && (
+                <span className="ml-1 inline-block bg-alerta text-white text-[10px] rounded-full px-1.5 leading-4 align-middle">
+                  {pendientesCount}
+                </span>
+              )}
             </Link>
           );
         })}
