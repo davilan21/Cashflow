@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { actualizarGastoPendiente, confirmarGastoPendiente } from "@/lib/supabase/queries";
@@ -28,6 +28,15 @@ export function PendientesClient({
   const { mensaje, mostrar } = useToast();
   const [pendientes, setPendientes] = useState(pendientesIniciales);
   const [sincronizando, setSincronizando] = useState(false);
+
+  // useState solo toma pendientesIniciales en el montaje inicial: sin este
+  // efecto, un router.refresh() (tras sincronizar/confirmar/descartar) trae
+  // props frescas del servidor pero el estado local se queda pegado en lo
+  // que había al montar — la lista se ve desactualizada aunque el badge de
+  // NavTabs (que no pasa por useState) sí refleje el conteo real.
+  useEffect(() => {
+    setPendientes(pendientesIniciales);
+  }, [pendientesIniciales]);
 
   const sincronizar = async () => {
     if (sincronizando) return;
@@ -72,7 +81,9 @@ export function PendientesClient({
     if (error) {
       setPendientes((prev) => [p, ...prev]);
       mostrar("No se pudo descartar");
+      return;
     }
+    router.refresh();
   };
 
   if (lecturaFallida) {
