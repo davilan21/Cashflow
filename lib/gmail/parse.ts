@@ -75,13 +75,89 @@ function limpiarDescripcion(desc: string): string {
   return desc.replace(/\s*Ref\s+\d+\s*$/i, "").trim().slice(0, 60);
 }
 
+// Palabras clave por comercio para el parser local (sin Claude): sin API key,
+// esta es la única forma de sugerir categoría. Calibrada contra comercios
+// reales de las notificaciones de Bancolombia de David — un comercio nuevo
+// que no calce con nada cae en "otros" hasta agregarlo aquí. Es substring
+// (no palabra completa) porque el nombre del comercio no siempre viene
+// separado por espacios de forma limpia (ej. "BOLD*Laika", "RAPPI COLOMBIA*DL").
+const PALABRAS_CATEGORIA_COMERCIO: [string, CategoryId][] = [
+  ["carulla", "mercado"],
+  ["exito", "mercado"],
+  ["éxito", "mercado"],
+  ["d1", "mercado"],
+  ["jumbo", "mercado"],
+  ["olimpica", "mercado"],
+  ["olímpica", "mercado"],
+  ["pricesmart", "mercado"],
+  ["oxxo", "mercado"],
+  ["mc donald", "restaurantes"],
+  ["frisby", "restaurantes"],
+  ["jenos", "restaurantes"],
+  ["cafeteria", "restaurantes"],
+  ["cafetería", "restaurantes"],
+  ["rappi", "restaurantes"],
+  ["andres carne", "restaurantes"],
+  ["tanuki", "restaurantes"],
+  ["kim chicken", "restaurantes"],
+  ["hornitos", "restaurantes"],
+  ["barra de cafe", "restaurantes"],
+  ["pizza", "restaurantes"],
+  ["gopass", "transporte"],
+  ["peaje", "transporte"],
+  ["parking", "transporte"],
+  ["parqueadero", "transporte"],
+  ["prquead", "transporte"],
+  ["dayparking", "transporte"],
+  ["uber", "transporte"],
+  ["didi", "transporte"],
+  ["claro", "vivienda"],
+  ["enel", "vivienda"],
+  ["gas natural", "vivienda"],
+  ["movistar", "vivienda"],
+  ["tigo", "vivienda"],
+  ["farmatodo", "salud"],
+  ["cruz verde", "salud"],
+  ["drogueria", "salud"],
+  ["droguería", "salud"],
+  ["sporty city", "salud"],
+  ["gimnasio", "salud"],
+  ["credimapfre", "salud"],
+  ["amazon", "compras"],
+  ["mercadolibre", "compras"],
+  ["merpago", "compras"],
+  ["miniso", "compras"],
+  ["libreria", "compras"],
+  ["librería", "compras"],
+  ["dollarcity", "compras"],
+  ["netflix", "suscripciones"],
+  ["spotify", "suscripciones"],
+  ["apple.com", "suscripciones"],
+  ["anthropic", "suscripciones"],
+  ["claude", "suscripciones"],
+  ["youworkforthem", "suscripciones"],
+  ["upwork", "suscripciones"],
+  ["we work remotely", "suscripciones"],
+  ["chatgpt", "suscripciones"],
+  ["icloud", "suscripciones"],
+];
+
+function detectarCategoriaComercio(comercio: string): CategoryId {
+  const texto = comercio.toLowerCase();
+  for (const [palabra, categoria] of PALABRAS_CATEGORIA_COMERCIO) {
+    if (texto.includes(palabra)) return categoria;
+  }
+  return "otros";
+}
+
 export function parsearNotificacionLocal(texto: string): GastoDetectado | null {
   const notificacion = REGEX_NOTIFICACION.exec(texto);
   if (notificacion) {
     const [, descripcion, montoTexto, dd, mm, yyyy] = notificacion;
     const monto = limpiarMonto(montoTexto);
     if (!(monto > 0)) return null;
-    return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota: limpiarDescripcion(descripcion), categoria: "otros" };
+    const nota = limpiarDescripcion(descripcion);
+    return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota, categoria: detectarCategoriaComercio(nota) };
   }
 
   const compra = REGEX_COMPRA.exec(texto);
@@ -89,7 +165,8 @@ export function parsearNotificacionLocal(texto: string): GastoDetectado | null {
     const [, montoTexto, comercio, dd, mm, yyyy] = compra;
     const monto = limpiarMonto(montoTexto);
     if (!(monto > 0)) return null;
-    return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota: limpiarDescripcion(comercio), categoria: "otros" };
+    const nota = limpiarDescripcion(comercio);
+    return { monto, fecha: `${yyyy}-${mm}-${dd}`, nota, categoria: detectarCategoriaComercio(nota) };
   }
 
   return null;

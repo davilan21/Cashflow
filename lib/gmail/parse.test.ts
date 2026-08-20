@@ -53,12 +53,12 @@ describe("extraerTextoPlano", () => {
 });
 
 describe("parsearNotificacionLocal", () => {
-  it("extrae monto, fecha y descripción del correo real de Bancolombia", () => {
+  it("extrae monto, fecha, descripción y categoría por palabra clave del comercio", () => {
     expect(parsearNotificacionLocal(TEXTO_NOTIFICACION)).toEqual({
       monto: 172860,
       fecha: "2026-08-17",
       nota: "pago Factura Programada CLARO SOLUCIONE",
-      categoria: "otros",
+      categoria: "vivienda",
     });
   });
 
@@ -69,7 +69,7 @@ describe("parsearNotificacionLocal", () => {
       monto: 45900,
       fecha: "2026-01-05",
       nota: "Compra Programada NETFLIX",
-      categoria: "otros",
+      categoria: "suscripciones",
     });
   });
 
@@ -86,7 +86,7 @@ describe("parsearNotificacionLocal", () => {
       monto: 31050,
       fecha: "2026-08-20",
       nota: "CITY PARKING PLAZA U",
-      categoria: "otros",
+      categoria: "transporte",
     });
   });
 
@@ -97,8 +97,14 @@ describe("parsearNotificacionLocal", () => {
       monto: 16100,
       fecha: "2026-08-15",
       nota: "GOPASS",
-      categoria: "otros",
+      categoria: "transporte",
     });
+  });
+
+  it("un comercio que no calza con ninguna palabra clave cae en 'otros'", () => {
+    const texto =
+      "¡Listo! Todo salió bien con tus movimientos Bancolombia: Compraste COP20.000,00 en TIENDA XYZ 123, el 10/08/2026 a las 10:00. Esta compra esta asociada a T.Cred *0459.";
+    expect(parsearNotificacionLocal(texto)?.categoria).toBe("otros");
   });
 
   it("un recordatorio de factura por pagar (no un gasto todavía) no matchea ningún patrón", () => {
