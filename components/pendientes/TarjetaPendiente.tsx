@@ -7,11 +7,15 @@ import type { Category, GastoPendiente } from "@/lib/types";
 export function TarjetaPendiente({
   pendiente,
   categorias,
+  seleccionado,
+  onCambiarSeleccion,
   onConfirmar,
   onDescartar,
 }: {
   pendiente: GastoPendiente;
   categorias: Category[];
+  seleccionado: boolean;
+  onCambiarSeleccion: (valor: boolean) => void;
   onConfirmar: (cambios: { monto: number; categoria: string; nota: string; fecha: string }) => void;
   onDescartar: () => void;
 }) {
@@ -29,6 +33,13 @@ export function TarjetaPendiente({
   return (
     <div className="bg-surface border border-line rounded-2xl px-4 py-3.5 mb-2.5">
       <div className="flex gap-2 mb-2">
+        <input
+          type="checkbox"
+          checked={seleccionado}
+          onChange={(e) => onCambiarSeleccion(e.target.checked)}
+          aria-label={`Seleccionar ${nota || "este pendiente"}`}
+          className="w-5 h-5 shrink-0 self-center accent-ink"
+        />
         <input
           value={nota}
           onChange={(e) => setNota(e.target.value)}

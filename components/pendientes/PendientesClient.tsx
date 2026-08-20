@@ -28,6 +28,8 @@ export function PendientesClient({
   const { mensaje, mostrar } = useToast();
   const [pendientes, setPendientes] = useState(pendientesIniciales);
   const [sincronizando, setSincronizando] = useState(false);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [confirmandoLote, setConfirmandoLote] = useState(false);
 
   // useState solo toma pendientesIniciales en el montaje inicial: sin este
   // efecto, un router.refresh() (tras sincronizar/confirmar/descartar) trae
@@ -63,8 +65,18 @@ export function PendientesClient({
     }
   };
 
+  const quitarDeSeleccion = (id: string) => {
+    setSeleccionados((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
   const confirmar = async (p: GastoPendiente, cambios: { monto: number; categoria: string; nota: string; fecha: string }) => {
     setPendientes((prev) => prev.filter((x) => x.id !== p.id));
+    quitarDeSeleccion(p.id);
     const { error } = await confirmarGastoPendiente(supabase, p.id, cambios);
     if (error) {
       setPendientes((prev) => [p, ...prev]);
@@ -77,12 +89,47 @@ export function PendientesClient({
 
   const descartar = async (p: GastoPendiente) => {
     setPendientes((prev) => prev.filter((x) => x.id !== p.id));
+    quitarDeSeleccion(p.id);
     const { error } = await actualizarGastoPendiente(supabase, p.id, { estado: "descartado" });
     if (error) {
       setPendientes((prev) => [p, ...prev]);
       mostrar("No se pudo descartar");
       return;
     }
+    router.refresh();
+  };
+
+  // Confirma en lote con los valores tal como están guardados en cada
+  // pendiente (no lo que haya sin guardar en el input de cada tarjeta) — el
+  // punto de seleccionar varios es aprobar rápido lo que ya se ve bien, no
+  // editar uno por uno. Si algo necesita corrección, se edita y confirma
+  // individual con su propio botón.
+  const confirmarSeleccionados = async () => {
+    if (seleccionados.size === 0 || confirmandoLote) return;
+    setConfirmandoLote(true);
+    const objetivo = pendientes.filter((p) => seleccionados.has(p.id));
+    const resultados = await Promise.all(
+      objetivo.map(async (p) => {
+        const { error } = await confirmarGastoPendiente(supabase, p.id, {
+          monto: p.monto,
+          categoria: p.categoria,
+          nota: p.nota,
+          fecha: p.fecha,
+        });
+        return { id: p.id, error };
+      })
+    );
+    const exitosos = new Set(resultados.filter((r) => !r.error).map((r) => r.id));
+    const fallidos = resultados.length - exitosos.size;
+
+    setPendientes((prev) => prev.filter((p) => !exitosos.has(p.id)));
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      exitosos.forEach((id) => next.delete(id));
+      return next;
+    });
+    setConfirmandoLote(false);
+    mostrar(fallidos > 0 ? `${exitosos.size} confirmados, ${fallidos} no se pudieron` : `${exitosos.size} gasto(s) confirmados`);
     router.refresh();
   };
 
@@ -139,15 +186,52 @@ export function PendientesClient({
           Nada pendiente por revisar.
         </div>
       ) : (
-        pendientes.map((p) => (
-          <TarjetaPendiente
-            key={p.id}
-            pendiente={p}
-            categorias={categorias}
-            onConfirmar={(cambios) => confirmar(p, cambios)}
-            onDescartar={() => descartar(p)}
-          />
-        ))
+        <>
+          <label className="flex items-center gap-2 text-[13px] text-muted mb-2 px-1">
+            <input
+              type="checkbox"
+              checked={pendientes.every((p) => seleccionados.has(p.id))}
+              onChange={(e) =>
+                setSeleccionados(e.target.checked ? new Set(pendientes.map((p) => p.id)) : new Set())
+              }
+              className="w-4 h-4 accent-ink"
+            />
+            Seleccionar todos ({pendientes.length})
+          </label>
+
+          {seleccionados.size > 0 && (
+            <div className="flex items-center justify-between gap-2 bg-surface border border-line rounded-2xl px-4 py-3 mb-3 sticky top-2 z-10 shadow-sm">
+              <span className="text-[13px] text-muted">{seleccionados.size} seleccionado(s)</span>
+              <Button
+                variant="primary"
+                className="!flex-none px-4"
+                onClick={confirmarSeleccionados}
+                disabled={confirmandoLote}
+              >
+                {confirmandoLote ? "…" : `Confirmar ${seleccionados.size}`}
+              </Button>
+            </div>
+          )}
+
+          {pendientes.map((p) => (
+            <TarjetaPendiente
+              key={p.id}
+              pendiente={p}
+              categorias={categorias}
+              seleccionado={seleccionados.has(p.id)}
+              onCambiarSeleccion={(valor) =>
+                setSeleccionados((prev) => {
+                  const next = new Set(prev);
+                  if (valor) next.add(p.id);
+                  else next.delete(p.id);
+                  return next;
+                })
+              }
+              onConfirmar={(cambios) => confirmar(p, cambios)}
+              onDescartar={() => descartar(p)}
+            />
+          ))}
+        </>
       )}
 
       <Toast mensaje={mensaje} />
