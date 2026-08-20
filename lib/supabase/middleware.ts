@@ -1,7 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const RUTAS_PUBLICAS = ["/login", "/auth/callback"];
+// /api/gmail/sync-cron no tiene sesión de usuario nunca: lo llama Vercel Cron
+// server-to-server, autenticado por su propio header Authorization (CRON_SECRET),
+// no por cookie. Sin esta excepción, este middleware lo redirige a /login antes
+// de que la ruta alcance a validar ese header, y el cron diario nunca corre.
+const RUTAS_PUBLICAS = ["/login", "/auth/callback", "/api/gmail/sync-cron"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
