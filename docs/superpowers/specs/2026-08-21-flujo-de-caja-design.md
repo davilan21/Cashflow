@@ -1,6 +1,6 @@
 # Proyección de flujo de caja — diseño
 
-Fecha: 2026-08-21 (v5 — pago de TC manual por PSE, tarjeta a nombre de la esposa)
+Fecha: 2026-08-21 (v6 — buzones cerrados, deudas manuales, saldo desde el ancla)
 
 ## Objetivo
 
@@ -88,8 +88,39 @@ se modifica: se lee.
   lo sean.
 - **El pago de la tarjeta es manual, por PSE.** No hay débito automático.
   Esto tiene tres consecuencias de diseño (ver sección propia).
-- **Segundo buzón**: David conecta **un segundo Gmail propio** para los
-  correos de PSE. No es el de otro miembro.
+- **Las deudas se configuran y se confirman a mano**, igual que el pago de
+  la tarjeta al principio. **No se detectan por correo.** El clasificador de
+  PSE no necesita reconocer cuotas de crédito, lo que le quita una clase
+  entera de encima. La proyección de las cuotas futuras sí es automática —
+  sale de la tabla de amortización; lo manual es confirmar que la cuota
+  efectivamente salió.
+- **El pago de la tarjeta normalmente es total**, pero puede no serlo. El
+  pago parcial es un caso borde real: se advierte, no se modela el
+  rotativo.
+- **Un buzón por módulo, sin solapamiento**: el Gmail conectado hoy es el de
+  **la esposa** — le llegan las alertas de compra de su tarjeta de
+  Bancolombia. El segundo buzón, por conectar, es el de **David** — le
+  llegan los comprobantes de PSE de su cuenta de Davibank. Cada módulo tiene
+  su buzón, su banco y su tipo de correo; no compiten por los mismos
+  mensajes.
+
+### Mapa de buzones
+
+| | Módulo tarjeta (existe) | Módulo flujo (nuevo) |
+|---|---|---|
+| Buzón | el de la esposa (conectado) | el de David (por conectar) |
+| Banco | Bancolombia | Davibank |
+| Instrumento | TC, titular la esposa | ahorros, titular David |
+| Correos | alertas de compra | comprobantes de PSE |
+| Tabla de conexión | `gmail_conexiones` | `flujo_conexiones` |
+| Bandeja | `gastos_pendientes` | `flujo_pendientes` |
+
+La tarjeta es de ella y las alertas llegan a su correo, que es justo el
+conectado: **la cobertura de compras de la tarjeta está completa**, no hay
+compras invisibles. Y quien paga es David desde su cuenta, así que el
+comprobante del pago llega a *su* buzón — el del otro módulo. Las dos
+mitades del riesgo #1 (el total del ciclo y su pago) entran por buzones
+distintos y se encuentran solo en el motor de proyección.
 - **Saldo de caja**: **semilla manual + deltas de PSE + re-anclaje**. Los
   correos describen movimientos, no saldos (confirmado en
   `lib/gmail/parse.ts`), así que la semilla es inevitable — pero es una sola
@@ -361,6 +392,13 @@ misma `fecha` y mismo destino, el nuevo se marca `posible_duplicado_de` y la
 bandeja los muestra juntos. No se descarta solo — dos pagos idénticos el
 mismo día existen.
 
+El riesgo real de duplicado **no** es que un movimiento llegue a los dos
+buzones: los buzones no se solapan (ver el mapa arriba). Es que **un mismo
+pago PSE genere dos correos dentro del mismo buzón** — típicamente uno del
+comercio y otro de ACH Colombia o del banco. Distinto remitente, distinto
+`mensaje_id`, mismo dinero. El unique por `(conexion_id, mensaje_id)` no lo
+atrapa; el dedupe difuso sí.
+
 ### `confirmar_flujo_pendiente()`
 
 Función nueva, hermana de la existente, con el mismo patrón probado:
@@ -407,7 +445,21 @@ interface Proyeccion {
 
 ### Algoritmo
 
-1. **Saldo de arranque**: último snapshot + `flujo_movimientos` posteriores.
+1. **Saldo de arranque**: se calcula **desde el ancla, no desde hoy**. Es el
+   último snapshot, más los `flujo_movimientos` reales posteriores, **más
+   los eventos proyectados de reglas y deudas que caen entre el ancla y hoy
+   y no tienen movimiento real emparejado**.
+
+   Este último término es el que hace que el modelo funcione con
+   confirmación manual. El arriendo del 5 y la cuota del crédito del 10 casi
+   seguro salieron, aunque nadie los haya confirmado en la app; ignorarlos
+   inflaría el saldo de hoy mes a mes. El emparejamiento es por
+   `(ref_id, periodo)` — nunca por monto o fecha sueltos — para no contar
+   dos veces la cuota que sí se confirmó.
+
+   El re-anclaje periódico corrige lo que se acumule de error, y **la
+   deriva contra el ancla es el número que dice qué tan buenos son los
+   supuestos**.
 2. **Expandir reglas** activas entre hoy y hoy+90, recortando al último día
    del mes cuando aplique. Los `gasto_fijo` con `medio_pago = 'tc'` **no**
    generan evento: alimentan el paso 4. Los ingresos `estimado` salen con
@@ -465,6 +517,11 @@ Claude como parser primario (tolerante al formato), regex local de respaldo.
 La clasificación de `pago_tc` usa las tres señales descritas arriba y
 `sin_clasificar` es una salida legítima: mejor preguntar que adivinar.
 
+**No hay clase `cuota_deuda` aquí**: las cuotas se confirman a mano. Un
+comprobante de PSE que resulte ser el pago de un crédito entra como `gasto`
+o `sin_clasificar` y David lo reclasifica desde la bandeja, donde puede
+apuntarlo a la deuda correspondiente.
+
 ### ⚠️ Prerrequisito: correos de muestra
 
 `lib/gmail/parse.ts` está calibrado contra dos formatos, ambos de compras
@@ -481,9 +538,14 @@ Antes de escribir `clasificar.ts`, David tiene que aportar correos reales
 - Si existen: transferencia enviada y abono de nómina.
 
 Sin eso cualquier regex es adivinanza — el mismo prerrequisito que ya se
-documentó en el plan de Gmail original. Además hay que confirmar **de quién
-llegan**: un comprobante PSE puede venir del comercio, de ACH Colombia o del
-banco, y de ahí sale la lista de remitentes del query de Gmail.
+documentó en el plan de Gmail original. Además hay que confirmar dos cosas
+mirando el buzón:
+
+- **De quién llegan**: un comprobante PSE puede venir del comercio, de ACH
+  Colombia o del banco. De ahí sale la lista de remitentes del query.
+- **Cuántos correos genera un solo pago**: si son dos (comercio + ACH), el
+  dedupe difuso deja de ser una salvaguarda teórica y pasa a ser el camino
+  normal, todos los días. Cambia cuánto trabajo hay que ponerle.
 
 ## UI: la pestaña Flujo
 
@@ -535,7 +597,7 @@ CRUD de reglas, deudas e instrumentos.
 |---|---|---|
 | 1 | **Cimientos** | Migración `0005` (solo `create table`) + `lib/flujo/proyeccion.ts` y `lib/flujo/deuda.ts` con tests. Sin UI. |
 | 2 | **Compromisos** | Pestaña Flujo con el CRUD de reglas e instrumentos. |
-| 3 | **Deudas** | CRUD de deudas + amortización visible. |
+| 3 | **Deudas** | CRUD de deudas + amortización visible + confirmación manual de cuotas. Sin detección por correo, ni ahora ni en la fase 6. |
 | 4 | **Proyección** | Curva de 90 días, mínimo, colchón, lista por semana, semilla y ajuste de saldo. **Aquí ya es útil, sin PSE.** |
 | 5 | **Bandeja manual** | `flujo_pendientes` + `confirmar_flujo_pendiente()` + UI, alimentada **a mano**. Prueba el ruteo por clase y el reemplazo del pago de TC sin depender de ningún correo. |
 | 6 | **PSE** | Depende de las muestras. `flujo_conexiones`, OAuth del segundo buzón, `clasificar.ts`, sync, dedupe difuso. **Aquí el saldo se mantiene casi solo.** |
@@ -566,16 +628,18 @@ solo conectar el parser a una tubería ya probada.
 1. **¿Quién manda los comprobantes de PSE?** ¿El comercio, ACH Colombia, o
    Davibank? De ahí sale la lista de remitentes del query de Gmail, y es lo
    primero que hay que mirar en el buzón.
-2. **⚠️ ¿Las alertas de compra de la tarjeta llegan *todas* al correo que ya
-   está conectado?** La tarjeta es de la esposa. Si el banco le manda a
-   ella alertas que David no ve, hay compras que la app nunca registra —
-   el total del ciclo queda subestimado y **el pago proyectado sale mal**.
-   Hasta ahora eso solo desajustaba el tope; con la proyección desajusta la
-   curva entera. Vale la pena cuadrar un mes contra el extracto real antes
-   de confiar en el número.
+2. **¿Un pago PSE genera uno o dos correos?** Si el comercio y ACH mandan
+   cada uno el suyo, el dedupe difuso pasa de salvaguarda a mecanismo de
+   uso diario.
 3. **¿A qué cuenta te llega la nómina?** Define el instrumento por defecto de
    la regla de ingreso.
-4. **¿Alguna vez pagas menos del total de la tarjeta?** Si el pago siempre
-   es total, la advertencia de pago parcial es un caso borde que casi nunca
-   se dispara. Si es habitual, hay que modelar el rotativo y eso es otro
-   alcance.
+### Cerradas
+
+- ~~*¿Las alertas de compra de la tarjeta llegan todas al correo
+  conectado?*~~ **Sí.** La tarjeta es de la esposa y el buzón conectado es
+  el de ella: la cobertura está completa, no hay compras invisibles.
+- ~~*¿Alguna vez pagas menos del total de la tarjeta?*~~ **Normalmente se
+  paga el total, pero puede pasar que no.** Se queda como caso borde: se
+  advierte el remanente y no se modela el rotativo con intereses.
+- ~~*¿Las cuotas de deuda se detectan por correo?*~~ **No, se configuran y
+  confirman a mano.**
