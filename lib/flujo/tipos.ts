@@ -35,9 +35,12 @@ export interface Regla {
   activa: boolean;
 }
 
+export type TipoDeuda = "credito" | "libranza" | "hipoteca" | "vehiculo" | "otro";
+
 export interface Deuda {
   id: string;
   nombre: string;
+  tipo: TipoDeuda;
   saldo_actual: number;
   saldo_a_fecha: string;
   /** Efectiva mensual en decimal: 0.0175 = 1.75% EM. */

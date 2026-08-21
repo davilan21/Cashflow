@@ -11,7 +11,7 @@
 
 import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
 import { sinTipar } from "@/lib/supabase/queries";
-import type { Deuda, Movimiento, Regla } from "./tipos";
+import type { Ancla, Deuda, Movimiento, Regla } from "./tipos";
 
 type Resultado<T> = { data: T | null; error: PostgrestError | null };
 type SinError = { error: PostgrestError | null };
@@ -37,6 +37,71 @@ export type NuevaDeuda = Omit<Deuda, "id">;
 // Lectura: RLS ya limita todo a la cuenta del usuario, así que no se filtra
 // por cuenta acá — pedir sin filtro devuelve exactamente las filas de la
 // cuenta. Mismo criterio que `lib/supabase/queries.ts`.
+
+export interface ConfigFlujo {
+  cuenta_id: string;
+  colchon: number;
+  horizonte_dias: number;
+  dias_recordatorio_saldo: number;
+}
+
+/** La configuración de la cuenta. No hay fila hasta que se guarda la primera vez. */
+export async function obtenerConfig(supabase: SupabaseClient): Promise<Resultado<ConfigFlujo>> {
+  const { data, error } = await sinTipar(supabase).from("flujo_config").select("*").maybeSingle();
+  return { data: data as ConfigFlujo | null, error };
+}
+
+export async function guardarConfig(
+  supabase: SupabaseClient,
+  cuentaId: string,
+  cambios: Partial<Omit<ConfigFlujo, "cuenta_id">>
+): Promise<SinError> {
+  const { error } = await sinTipar(supabase)
+    .from("flujo_config")
+    .upsert({ ...cambios, cuenta_id: cuentaId }, { onConflict: "cuenta_id" });
+  return { error };
+}
+
+/**
+ * El ancla más reciente: el saldo desde el que se reconstruye todo.
+ * Solo el consolidado (instrumento_id nulo) — los saldos por instrumento
+ * quedan para cuando haya vista por cuenta.
+ */
+export async function ultimoSaldo(supabase: SupabaseClient): Promise<Resultado<Ancla>> {
+  const { data, error } = await sinTipar(supabase)
+    .from("flujo_saldos")
+    .select("fecha, monto")
+    .is("instrumento_id", null)
+    .order("fecha", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return { data: data as Ancla | null, error };
+}
+
+/** Re-anclar es insertar, nunca editar: así queda el historial de la deriva. */
+export async function crearSaldo(
+  supabase: SupabaseClient,
+  cuentaId: string,
+  fecha: string,
+  monto: number
+): Promise<SinError> {
+  const { error } = await sinTipar(supabase)
+    .from("flujo_saldos")
+    .insert({ cuenta_id: cuentaId, fecha, monto, origen: "manual" });
+  return { error };
+}
+
+/**
+ * Qué gasto de `expenses` corresponde a qué regla. Vive en una tabla lateral
+ * porque `expenses` no se toca; el motor lo usa para no proyectar dos veces un
+ * fijo que ya llegó, y para excluir los fijos del run-rate.
+ */
+export async function listarReglasExpenses(
+  supabase: SupabaseClient
+): Promise<Resultado<{ regla_id: string; expense_id: string }[]>> {
+  const { data, error } = await sinTipar(supabase).from("flujo_reglas_expenses").select("regla_id, expense_id");
+  return { data: data as { regla_id: string; expense_id: string }[] | null, error };
+}
 
 export async function listarInstrumentos(supabase: SupabaseClient): Promise<Resultado<Instrumento[]>> {
   const { data, error } = await sinTipar(supabase)
@@ -132,6 +197,55 @@ export async function listarDeudas(supabase: SupabaseClient): Promise<Resultado<
     .select("*")
     .order("nombre", { ascending: true });
   return { data: data as Deuda[] | null, error };
+}
+
+export async function crearDeuda(
+  supabase: SupabaseClient,
+  cuentaId: string,
+  deuda: NuevaDeuda
+): Promise<Resultado<Deuda>> {
+  const { data, error } = await sinTipar(supabase)
+    .from("flujo_deudas")
+    .insert({ ...deuda, cuenta_id: cuentaId })
+    .select()
+    .single();
+  return { data: data as Deuda | null, error };
+}
+
+export async function actualizarDeuda(
+  supabase: SupabaseClient,
+  id: string,
+  cambios: Partial<NuevaDeuda>
+): Promise<SinError> {
+  const { error } = await sinTipar(supabase).from("flujo_deudas").update(cambios).eq("id", id);
+  return { error };
+}
+
+export async function eliminarDeuda(supabase: SupabaseClient, id: string): Promise<SinError> {
+  const { error } = await sinTipar(supabase).from("flujo_deudas").delete().eq("id", id);
+  return { error };
+}
+
+/**
+ * Registra el pago de una cuota. Va por RPC porque son dos escrituras que
+ * tienen que ir juntas: el movimiento en el libro y el avance de la deuda.
+ * Por separado, una podría fallar y dejar la cuota contada dos veces (o el
+ * saldo descuadrado).
+ */
+export async function confirmarCuotaDeuda(
+  supabase: SupabaseClient,
+  deudaId: string,
+  fecha: string,
+  monto: number,
+  saldoDespues: number
+): Promise<Resultado<string>> {
+  const { data, error } = await sinTipar(supabase).rpc("confirmar_cuota_deuda", {
+    p_deuda_id: deudaId,
+    p_fecha: fecha,
+    p_monto: monto,
+    p_saldo_despues: saldoDespues,
+  });
+  return { data: data as string | null, error };
 }
 
 export async function listarMovimientos(supabase: SupabaseClient): Promise<Resultado<Movimiento[]>> {

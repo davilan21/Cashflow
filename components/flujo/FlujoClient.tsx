@@ -4,14 +4,21 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  actualizarDeuda,
   actualizarInstrumento,
   actualizarRegla,
+  confirmarCuotaDeuda,
+  crearDeuda,
   crearInstrumento,
   crearRegla,
+  crearSaldo,
+  eliminarDeuda,
   eliminarInstrumento,
   eliminarRegla,
+  guardarConfig,
   marcarPrincipal,
   type Instrumento,
+  type NuevaDeuda,
   type NuevaRegla,
   type NuevoInstrumento,
 } from "@/lib/flujo/queries";
@@ -23,10 +30,14 @@ import { Toast } from "@/components/ui/Toast";
 import { pesos } from "@/lib/money";
 import { ReglaModal } from "./ReglaModal";
 import { InstrumentoModal } from "./InstrumentoModal";
+import { DeudaModal } from "./DeudaModal";
+import { DeudasLista } from "./DeudasLista";
+import { Proyeccion } from "./Proyeccion";
+import { SaldoModal } from "./SaldoModal";
 import type { Category } from "@/lib/types";
-import type { Regla, TipoRegla } from "@/lib/flujo/tipos";
+import type { Ancla, Deuda, Proyeccion as TipoProyeccion, Regla, TipoRegla } from "@/lib/flujo/tipos";
 
-type Seccion = "compromisos" | "cuentas";
+type Seccion = "proyeccion" | "compromisos" | "deudas" | "cuentas";
 
 const GRUPOS: { tipo: TipoRegla; titulo: string; vacio: string }[] = [
   { tipo: "ingreso", titulo: "Ingresos", vacio: "Sin ingresos todavía. La nómina va acá." },
@@ -36,13 +47,25 @@ const GRUPOS: { tipo: TipoRegla; titulo: string; vacio: string }[] = [
 
 export function FlujoClient({
   cuentaId,
+  proyeccion,
+  hoy,
+  ancla,
+  colchon,
+  diasRecordatorio,
   reglasIniciales,
+  deudasIniciales,
   instrumentosIniciales,
   categorias,
   lecturaFallida,
 }: {
   cuentaId: string | null;
+  proyeccion: TipoProyeccion;
+  hoy: string;
+  ancla: Ancla | null;
+  colchon: number;
+  diasRecordatorio: number;
   reglasIniciales: Regla[];
+  deudasIniciales: Deuda[];
   instrumentosIniciales: Instrumento[];
   categorias: Category[];
   lecturaFallida: boolean;
@@ -51,8 +74,9 @@ export function FlujoClient({
   const router = useRouter();
   const { mensaje, mostrar } = useToast();
 
-  const [seccion, setSeccion] = useState<Seccion>("compromisos");
+  const [seccion, setSeccion] = useState<Seccion>("proyeccion");
   const [reglas, setReglas] = useState(reglasIniciales);
+  const [deudas, setDeudas] = useState(deudasIniciales);
   const [instrumentos, setInstrumentos] = useState(instrumentosIniciales);
 
   const [modalRegla, setModalRegla] = useState<{ abierto: boolean; regla: Regla | null }>({
@@ -63,6 +87,11 @@ export function FlujoClient({
     abierto: false,
     instrumento: null,
   });
+  const [modalDeuda, setModalDeuda] = useState<{ abierto: boolean; deuda: Deuda | null }>({
+    abierto: false,
+    deuda: null,
+  });
+  const [modalSaldo, setModalSaldo] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   // Si la carga inicial falló, la pantalla queda de solo lectura: escribir
@@ -119,6 +148,102 @@ export function FlujoClient({
       setReglas(previas);
       mostrar("No se pudo cambiar el estado");
     }
+  };
+
+  /**
+   * Anclar el saldo: se inserta un snapshot nuevo, nunca se edita el anterior,
+   * para conservar el historial de la deriva. El colchón va en la misma
+   * operación porque se editan juntos.
+   */
+  const anclarSaldo = async (fecha: string, monto: number, nuevoColchon: number) => {
+    if (guardando || !cuentaId) return;
+    setGuardando(true);
+    const { error } = await crearSaldo(supabase, cuentaId, fecha, monto);
+    if (error) {
+      setGuardando(false);
+      mostrar("No se pudo guardar el saldo");
+      return;
+    }
+    if (nuevoColchon !== colchon) {
+      const { error: errorConfig } = await guardarConfig(supabase, cuentaId, { colchon: nuevoColchon });
+      // El saldo ya quedó, que es lo importante; si el colchón falla se avisa
+      // pero no se revierte el ancla.
+      if (errorConfig) mostrar("El saldo quedó, pero no se pudo guardar el colchón");
+    }
+    setGuardando(false);
+    setModalSaldo(false);
+    mostrar("Saldo actualizado");
+    router.refresh();
+  };
+
+  const guardarDeuda = async (datos: NuevaDeuda) => {
+    if (guardando || !cuentaId) return;
+    setGuardando(true);
+    const editando = modalDeuda.deuda;
+
+    if (editando) {
+      const { error } = await actualizarDeuda(supabase, editando.id, datos);
+      setGuardando(false);
+      if (error) {
+        mostrar("No se pudo guardar la deuda");
+        return;
+      }
+      setDeudas((prev) => prev.map((d) => (d.id === editando.id ? { ...d, ...datos } : d)));
+    } else {
+      const { data, error } = await crearDeuda(supabase, cuentaId, datos);
+      setGuardando(false);
+      if (error || !data) {
+        mostrar("No se pudo crear la deuda");
+        return;
+      }
+      setDeudas((prev) => [...prev, data]);
+    }
+
+    setModalDeuda({ abierto: false, deuda: null });
+    mostrar("Deuda guardada");
+    router.refresh();
+  };
+
+  const borrarDeuda = async (deuda: Deuda) => {
+    if (!confirm(`¿Eliminar "${deuda.nombre}"?`)) return;
+    const previas = deudas;
+    setDeudas((prev) => prev.filter((d) => d.id !== deuda.id));
+    const { error } = await eliminarDeuda(supabase, deuda.id);
+    if (error) {
+      setDeudas(previas);
+      mostrar("No se pudo eliminar");
+      return;
+    }
+    mostrar("Deuda eliminada");
+    router.refresh();
+  };
+
+  /**
+   * Registrar una cuota avanza la deuda y escribe el movimiento. Va por RPC
+   * porque las dos cosas tienen que pasar juntas — y por eso acá NO se hace
+   * actualización optimista: si se pintara el avance antes de confirmar y el
+   * servidor rechazara, la pantalla mostraría una cuota pagada que no existe.
+   */
+  const registrarCuota = async (deuda: Deuda, fecha: string, monto: number, saldoDespues: number) => {
+    if (guardando) return;
+    setGuardando(true);
+    const { error } = await confirmarCuotaDeuda(supabase, deuda.id, fecha, monto, saldoDespues);
+    setGuardando(false);
+    if (error) {
+      // 23505 = el índice único (cuenta, ref_id, ref_periodo): esta cuota ya
+      // se había confirmado, probablemente desde otra pestaña.
+      mostrar(error.code === "23505" ? "Esa cuota ya estaba registrada" : "No se pudo registrar la cuota");
+      return;
+    }
+    setDeudas((prev) =>
+      prev.map((d) =>
+        d.id === deuda.id
+          ? { ...d, saldo_actual: saldoDespues, saldo_a_fecha: fecha, cuotas_pagadas: d.cuotas_pagadas + 1 }
+          : d
+      )
+    );
+    mostrar("Cuota registrada");
+    router.refresh();
   };
 
   const guardarInstrumento = async (datos: NuevoInstrumento) => {
@@ -187,14 +312,16 @@ export function FlujoClient({
       <div className="flex gap-1.5 mb-4">
         {(
           [
+            ["proyeccion", "Proyección"],
             ["compromisos", "Compromisos"],
+            ["deudas", "Deudas"],
             ["cuentas", "Cuentas"],
           ] as [Seccion, string][]
         ).map(([id, texto]) => (
           <button
             key={id}
             onClick={() => setSeccion(id)}
-            className={`flex-1 px-3 py-2.5 rounded-xl border text-sm ${
+            className={`flex-1 px-1 py-2.5 rounded-xl border text-xs sm:text-sm truncate ${
               seccion === id ? "border-ink bg-ink text-white" : "border-line bg-surface text-muted"
             }`}
           >
@@ -203,7 +330,26 @@ export function FlujoClient({
         ))}
       </div>
 
-      {seccion === "compromisos" ? (
+      {seccion === "proyeccion" ? (
+        <Proyeccion
+          proyeccion={proyeccion}
+          colchon={colchon}
+          hoy={hoy}
+          ancla={ancla}
+          diasRecordatorio={diasRecordatorio}
+          soloLectura={soloLectura}
+          onAjustarSaldo={() => setModalSaldo(true)}
+        />
+      ) : seccion === "deudas" ? (
+        <DeudasLista
+          deudas={deudas}
+          soloLectura={soloLectura}
+          onEditar={(d) => setModalDeuda({ abierto: true, deuda: d })}
+          onEliminar={borrarDeuda}
+          onNueva={() => setModalDeuda({ abierto: true, deuda: null })}
+          onConfirmarCuota={registrarCuota}
+        />
+      ) : seccion === "compromisos" ? (
         <>
           {GRUPOS.map((grupo) => {
             const delGrupo = reglas.filter((r) => r.tipo === grupo.tipo);
@@ -355,6 +501,27 @@ export function FlujoClient({
           guardando={guardando}
           onGuardar={guardarRegla}
           onCerrar={() => setModalRegla({ abierto: false, regla: null })}
+        />
+      )}
+
+      {modalSaldo && (
+        <SaldoModal
+          ancla={ancla}
+          saldoProyectado={proyeccion.saldoHoy}
+          colchon={colchon}
+          guardando={guardando}
+          onGuardar={anclarSaldo}
+          onCerrar={() => setModalSaldo(false)}
+        />
+      )}
+
+      {modalDeuda.abierto && (
+        <DeudaModal
+          deuda={modalDeuda.deuda}
+          instrumentos={instrumentos.filter((i) => i.activo)}
+          guardando={guardando}
+          onGuardar={guardarDeuda}
+          onCerrar={() => setModalDeuda({ abierto: false, deuda: null })}
         />
       )}
 

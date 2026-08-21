@@ -6,6 +6,7 @@ function deuda(cambios: Partial<Deuda> = {}): Deuda {
   return {
     id: "d1",
     nombre: "Crédito",
+    tipo: "credito",
     saldo_actual: 12_000_000,
     saldo_a_fecha: "2026-08-05",
     tasa_mensual: 0.015,

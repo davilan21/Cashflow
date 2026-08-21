@@ -30,6 +30,14 @@ export const TIPOS_INSTRUMENTO = [
   { id: "efectivo", etiqueta: "Efectivo" },
 ] as const;
 
+export const TIPOS_DEUDA = [
+  { id: "credito", etiqueta: "Crédito de consumo" },
+  { id: "libranza", etiqueta: "Libranza" },
+  { id: "hipoteca", etiqueta: "Hipoteca" },
+  { id: "vehiculo", etiqueta: "Vehículo" },
+  { id: "otro", etiqueta: "Otro" },
+] as const;
+
 export const MEDIOS_PAGO = [
   { id: "debito", etiqueta: "Débito" },
   { id: "tc", etiqueta: "Tarjeta de crédito" },

@@ -139,6 +139,7 @@ describe("expandirDeudas", () => {
   const deuda: Deuda = {
     id: "d1",
     nombre: "Crédito carro",
+    tipo: "vehiculo",
     saldo_actual: 12_000_000,
     saldo_a_fecha: "2026-08-01",
     tasa_mensual: 0.015,
