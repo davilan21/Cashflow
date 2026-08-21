@@ -1,6 +1,6 @@
 # Proyección de flujo de caja — diseño
 
-Fecha: 2026-08-21 (v2 — incorpora lectura de débito/PSE y multi-buzón)
+Fecha: 2026-08-21 (v3 — incorpora multi-banco: Bancolombia + Davibank)
 
 ## Objetivo
 
@@ -32,9 +32,14 @@ convierte en el alimentador principal de la proyección.
   (confirmado en `lib/gmail/parse.ts`). El modelo es **semilla + deltas +
   re-anclaje**: David ingresa su saldo una vez, Gmail lo mantiene al día, y
   puede re-anclarlo cuando se desvíe.
-- **Multi-buzón**: hay que poder conectar **más de una cuenta de Gmail**
-  (la de la pareja, y/o un segundo buzón propio). El esquema actual
-  (`gmail_conexiones` con `user_id` como PK) no lo permite.
+- **Multi-buzón**: hay que poder conectar **dos cuentas de Gmail propias
+  de David** (no de otro miembro). El esquema actual (`gmail_conexiones` con
+  `user_id` como PK) no lo permite: un usuario, una conexión.
+- **Multi-banco**: la tarjeta de crédito es de **Bancolombia**; la cuenta de
+  ahorros es de **Davibank** (antes Scotiabank Colpatria). Son remitentes,
+  formatos de correo y numeraciones distintas. El parser deja de ser
+  "el parser de Bancolombia" y pasa a ser un registro de adaptadores por
+  banco.
 - **Granularidad**: **día a día, horizonte de 90 días**. La curva fina es lo
   que muestra los apretones *dentro* del mes — entre el pago de la TC el 30
   y la siguiente quincena — que es donde duele y que una vista mensual
@@ -151,6 +156,14 @@ alter table movimientos_pendientes add column medio_pago text not null default '
   check (medio_pago in ('tc', 'debito', 'efectivo'));
 alter table movimientos_pendientes add column instrumento_id uuid references instrumentos(id);
 alter table movimientos_pendientes add column conexion_id uuid references gmail_conexiones(id);
+
+-- El unique era (creado_por, gmail_message_id). Con dos buzones del MISMO
+-- usuario eso deja de ser seguro: los ids de mensaje solo son únicos dentro
+-- de un buzón, así que una colisión entre los dos buzones de David
+-- descartaría en silencio un movimiento real. La llave pasa a ser la conexión.
+alter table movimientos_pendientes drop constraint gastos_pendientes_creado_por_gmail_message_id_key;
+alter table movimientos_pendientes add constraint movimientos_pendientes_msg_unico
+  unique (conexion_id, gmail_message_id);
 alter table movimientos_pendientes alter column categoria drop not null;  -- un ingreso no tiene categoría
 ```
 
@@ -186,11 +199,18 @@ uno de la de su pareja, ni una compra de crédito de una de débito.
 |---|---|---|
 | `id` | uuid, PK | |
 | `cuenta_id` | uuid | |
-| `nombre` | text | "Ahorros Bancolombia", "TC Visa David" |
+| `nombre` | text | "Ahorros Davibank", "TC Visa Bancolombia" |
+| `banco` | text | `bancolombia` \| `davibank` \| `otro` |
 | `tipo` | text | `ahorros` \| `corriente` \| `tc` \| `efectivo` |
 | `ultimos4` | text, null | llave de ruteo desde las alertas |
+| `alias_pago` | text[], null | cómo aparece este instrumento **como destino** en el extracto de otro banco (ver "pago entre bancos") |
 | `titular` | uuid, null | qué miembro es el titular |
 | `activo` | bool | |
+
+**La llave de ruteo es `(banco, ultimos4)`, no `ultimos4` solo.** Un `*1234`
+de Bancolombia y un `*1234` de Davibank son instrumentos distintos; el banco
+sale del remitente del correo. Rutear solo por los cuatro dígitos es una
+colisión esperando a pasar.
 
 `medio_pago` se deriva del `tipo` del instrumento cuando hay uno; se queda
 como campo propio para que todo funcione sin configurar instrumentos (un
@@ -336,28 +356,91 @@ Mapa de tipos de alerta de Bancolombia a clases:
 
 Las dos filas que hay que acertar sí o sí son **pago a la propia TC**
 (riesgo #4) y **transferencia entre cuentas propias** (contarla infla el
-gasto y desinfla el saldo a la vez). Ambas se detectan comparando el
-`ultimos4` de destino contra `instrumentos` — por eso esa tabla no es
-opcional.
+gasto y desinfla el saldo a la vez).
+
+### Adaptadores por banco
+
+`REMITENTES_BANCOLOMBIA` y los regex de `lib/gmail/parse.ts` dejan de ser
+constantes sueltas y pasan a un registro:
+
+```ts
+interface AdaptadorBanco {
+  id: 'bancolombia' | 'davibank';
+  remitentes: string[];              // para el query de Gmail
+  parsearLocal(texto: string): MovimientoDetectado | null;   // regex de respaldo
+}
+```
+
+El query de Gmail se arma con la unión de los remitentes de todos los
+adaptadores. El banco de un correo sale de su remitente, y de ahí sale la
+mitad de la llave de ruteo `(banco, ultimos4)`. Claude sigue siendo el
+parser primario (es tolerante al formato); el regex local es por banco.
+
+**Ojo con el rebrand**: Davibank era Scotiabank Colpatria, así que el
+histórico del buzón puede tener correos con el remitente y el formato
+viejos. Para el backfill de 30 días probablemente ya solo exista el formato
+nuevo; si se quisiera importar más atrás, el adaptador necesitaría soportar
+los dos.
+
+### El pago de la TC cruza bancos ⚠️
+
+El caso del riesgo #4 se complica: la TC es de Bancolombia y el pago sale de
+Davibank. La alerta de débito la manda **Davibank**, y su destino **no** es
+un `*NNNN` — un pago PSE identifica al beneficiario por nombre
+("Bancolombia Tarjeta de Crédito", "PSE - Bancolombia", o lo que use el
+extracto). No hay cuatro dígitos que comparar.
+
+Por eso `instrumentos.alias_pago` es un arreglo de patrones de texto: cómo
+se ve *este* instrumento cuando aparece como destino en el extracto de otro
+banco. La detección combina tres señales:
+
+1. El nombre del beneficiario calza con algún `alias_pago` de un instrumento
+   `tipo = 'tc'`.
+2. El monto coincide (o casi) con el total de un ciclo cerrado sin pagar.
+3. La fecha cae cerca de `cicloPago()` de ese ciclo.
+
+Con las tres, la app propone `clase = 'pago_tc'` con el ciclo ya
+seleccionado. Con menos, cae a la bandeja como movimiento sin clasificar y
+David decide. **Nunca se autoconfirma**: equivocarse aquí es exactamente el
+doble conteo del riesgo #4.
 
 ### ⚠️ Prerrequisito: correos de muestra
 
 `lib/gmail/parse.ts` hoy solo tiene regex calibrados contra **dos** formatos
-reales confirmados, ambos de tarjeta de crédito. **No hay muestras de las
-alertas de PSE, transferencia, nómina ni retiro.** Antes de escribir el
-parser, David tiene que aportar un correo real de cada tipo (con datos
-tapados si quiere). Sin eso, cualquier regex es adivinanza — el mismo
-problema que ya se documentó en el plan de Gmail original.
+reales confirmados, ambos de tarjeta de crédito de Bancolombia. **De
+Davibank no hay una sola muestra**, y ni siquiera está confirmado que mande
+alertas transaccionales por correo con el monto adentro.
+
+Antes de escribir el adaptador, David tiene que aportar un correo real de
+cada tipo (con datos tapados si quiere):
+
+- Davibank: compra con débito, pago PSE, transferencia enviada, transferencia
+  recibida, abono de nómina, retiro en cajero.
+- Bancolombia: el pago de la TC visto desde el lado que lo reciba, si es que
+  llega alerta.
+
+Sin eso, cualquier regex es adivinanza — el mismo problema que ya se
+documentó en el plan de Gmail original. **Si resulta que Davibank no manda
+alertas con monto, la fase 6 se cae** y el saldo se queda en semilla manual
++ ajuste periódico, o toca buscar otra fuente (extracto PDF mensual al
+correo, por ejemplo).
 
 El parser primario sigue siendo Claude (más tolerante a variaciones de
 formato) con el regex local de respaldo.
 
 ## Multi-buzón: el dedupe cruzado
 
-El unique actual es `(creado_por, gmail_message_id)` — deduplica *dentro* de
-un buzón. Con dos buzones conectados a la misma cuenta bancaria compartida,
-**el mismo movimiento llega como dos correos distintos con ids distintos** y
-pasa el unique sin problema. Resultado: cada gasto contado dos veces.
+Como los dos buzones son **del mismo usuario**, el unique actual
+`(creado_por, gmail_message_id)` deja de ser una llave sana: los ids de
+mensaje de Gmail solo son únicos *dentro* de un buzón, así que una colisión
+entre los dos descartaría en silencio un movimiento real. Por eso la llave
+pasa a `(conexion_id, gmail_message_id)`.
+
+Con eso arreglado queda el otro caso: **el mismo movimiento llegando a los
+dos buzones** como dos correos con ids distintos (por reenvío, o porque las
+dos direcciones están registradas en el banco). Pasa el unique sin problema
+y el gasto se cuenta dos veces. Es menos probable ahora que los buzones son
+de bancos distintos, pero no imposible.
 
 Solución: además del unique por mensaje, un **dedupe difuso** al insertar —
 si ya existe un movimiento (pendiente o confirmado) con el mismo `monto`,
@@ -449,9 +532,12 @@ son datos que se consultan y ajustan, no configuración que se toca una vez.
 
 ### Cambios a pantallas existentes
 
-- **Cuenta → Gmail**: lista de conexiones (N buzones) con estado y
-  "conectar otra cuenta".
-- **Cuenta → Instrumentos**: CRUD de cuentas y tarjetas con sus últimos 4.
+- **Cuenta → Gmail**: lista de los buzones conectados (los dos de David) con
+  su estado y "conectar otra cuenta". Cada buzón puede expirar por su lado —
+  el modo Testing de Google caduca el refresh token cada ~7 días — así que
+  el aviso de reconectar tiene que ser **por conexión**, no global.
+- **Cuenta → Instrumentos**: CRUD de cuentas y tarjetas, con banco, últimos 4
+  y alias de pago.
 - **Pendientes**: agrupa por clase (gastos / ingresos / pagos), permite
   cambiar la clase de un movimiento mal clasificado, y marca los posibles
   duplicados entre buzones.
@@ -475,16 +561,22 @@ son datos que se consultan y ajustan, no configuración que se toca una vez.
 | 2 | **Compromisos** | CRUD de reglas (ingresos fijos y estimados + gastos fijos) e instrumentos. |
 | 3 | **Deudas** | CRUD de deudas + tabla de amortización visible. |
 | 4 | **Flujo** | Curva de 90 días, saldo mínimo, colchón, lista por semana, ajuste manual de saldo. **Aquí ya es útil.** |
-| 5 | **Multi-buzón** | `gmail_conexiones` con id propio, sync por conexión, UI de N buzones, dedupe difuso cruzado. |
-| 6 | **Débito y PSE** | Muestras reales → clasificador de movimientos, rename a `movimientos_pendientes`, `confirmar_movimiento_pendiente()` con ruteo, bandeja por clase. **Aquí el saldo se mantiene solo.** |
-| 7 | **Círculo cerrado** | Inversiones + colchón liquidable, tope sugerido, alertas cruzadas. |
+| 5 | **Multi-buzón** | `gmail_conexiones` con id propio, unique por `(conexion_id, gmail_message_id)`, sync por conexión, UI de N buzones con estado independiente, dedupe difuso. |
+| 6 | **Clasificador** | Rename a `movimientos_pendientes`, `confirmar_movimiento_pendiente()` con ruteo por clase, bandeja agrupada, `instrumentos` en uso. Se puede probar con las alertas de Bancolombia que ya llegan. |
+| 7 | **Adaptador Davibank** | Depende de las muestras. Registro de adaptadores por banco, parser de débito/PSE/nómina, detección del pago de TC entre bancos. **Aquí el saldo se mantiene solo.** |
+| 8 | **Círculo cerrado** | Inversiones + colchón liquidable, tope sugerido, alertas cruzadas. |
 
-**Orden 4 → 5 → 6**: el saldo semilla manual es técnicamente obligatorio de
-todas formas (Gmail da movimientos, no saldos), y con solo la semilla la
-curva ya sirve. La fase 6 es la que la vuelve automática, y depende de tener
-muestras de correo que hoy no existen. Las fases 5 y 6 se pueden adelantar
-antes de la 4 si mantener el saldo a mano resulta molesto — no rompen nada
-de 1–3, solo retrasan la primera curva.
+**Por qué 6 y 7 van separadas**: la fase 6 no necesita ni una muestra nueva
+— el clasificador y el ruteo se construyen y prueban con las alertas de
+Bancolombia que ya llegan hoy, dejando el terreno listo. La fase 7 es la
+única bloqueada por muestras de Davibank, y es también la única que puede
+resultar inviable si ese banco no manda alertas con monto.
+
+**Por qué la 4 va antes que la 5–7**: el saldo semilla manual es
+técnicamente obligatorio de todas formas (Gmail da movimientos, no saldos),
+y con solo la semilla la curva ya sirve. Si mantener el saldo a mano resulta
+molesto, 5–7 se pueden adelantar sin romper nada de 1–3 — solo retrasan la
+primera curva.
 
 ## Restricciones heredadas del proyecto
 
@@ -505,9 +597,12 @@ de 1–3, solo retrasan la primera curva.
    por defecto es que la app **sugiera** el emparejamiento y David confirme
    desde la bandeja — consistente con el principio de revisión obligatoria
    del proyecto. Se asume esto salvo indicación contraria.
-2. **El segundo buzón**: ¿es el de la pareja (otro miembro de la cuenta,
-   cada quien conecta el suyo) o un segundo buzón del propio David? El
-   diseño soporta ambos, pero cambia la UI: en el primer caso cada miembro
-   conecta desde su sesión; en el segundo, un usuario administra varios.
-3. **Bancos**: ¿la cuenta de ahorros es también Bancolombia, o hay otro
-   banco cuyas alertas habría que parsear aparte?
+2. **¿Davibank manda alertas transaccionales por correo, con el monto
+   adentro?** Es el supuesto del que cuelga toda la fase 7. Si no, hay que
+   buscar otra fuente o quedarse con el ajuste manual del saldo.
+3. **¿Cómo pagas la tarjeta de Bancolombia?** Si es por PSE desde Davibank,
+   la detección del pago es la de "pago entre bancos" descrita arriba. Si es
+   por débito automático o desde la app de Bancolombia, la alerta puede
+   verse muy distinta — o no llegar.
+4. **¿A qué cuenta te llega la nómina?** Define el instrumento por defecto de
+   la regla de ingreso, y de paso desde dónde salen los gastos fijos.
