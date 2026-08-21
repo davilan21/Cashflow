@@ -1,6 +1,6 @@
 # Proyección de flujo de caja — diseño
 
-Fecha: 2026-08-21 (v4 — aislado del módulo de tarjeta, fuente principal PSE)
+Fecha: 2026-08-21 (v5 — pago de TC manual por PSE, tarjeta a nombre de la esposa)
 
 ## Objetivo
 
@@ -80,8 +80,14 @@ se modifica: se lee.
 - **Fuente principal de salidas de efectivo: los correos de PSE.** Son los
   que muestran los pagos que salen de la cuenta de ahorros. No las alertas
   del banco.
-- **Cuentas**: la tarjeta de crédito es de **Bancolombia** (ya conectada);
-  la de ahorros es de **Davibank** (antes Scotiabank Colpatria).
+- **Cuentas**: la tarjeta de crédito es de **Bancolombia** y está **a nombre
+  de la esposa de David** (ya conectada al módulo de gastos); la cuenta de
+  ahorros desde la que se paga es de **David**, en **Davibank** (antes
+  Scotiabank Colpatria). El titular de la tarjeta y el dueño de la cuenta
+  que la paga **no son la misma persona**, y el diseño no puede asumir que
+  lo sean.
+- **El pago de la tarjeta es manual, por PSE.** No hay débito automático.
+  Esto tiene tres consecuencias de diseño (ver sección propia).
 - **Segundo buzón**: David conecta **un segundo Gmail propio** para los
   correos de PSE. No es el de otro miembro.
 - **Saldo de caja**: **semilla manual + deltas de PSE + re-anclaje**. Los
@@ -138,18 +144,25 @@ y otra como el pago.
 Tiene que clasificarse `pago_tc`, y al existir el pago real el evento
 proyectado de ese ciclo se **reemplaza**, no se suma.
 
-**Y cruza bancos**: la TC es de Bancolombia y el pago sale de Davibank. El
-destino en un comprobante PSE **no** es un `*NNNN` — es un nombre de
-beneficiario ("Bancolombia Tarjeta de Crédito" o similar). No hay dígitos
-que comparar. La detección combina tres señales:
+**La buena noticia**: David confirmó que paga la tarjeta por PSE, así que
+**siempre va a llegar comprobante**. El caso no depende de una fuente que no
+existe — depende de clasificar bien un correo que sí llega.
+
+**Y cruza bancos**: la TC es de Bancolombia (a nombre de la esposa) y el
+pago sale de Davibank (cuenta de David). El destino en un comprobante PSE
+**no** es un `*NNNN` propio — es un nombre de beneficiario ("Bancolombia
+Tarjeta de Crédito" o similar), y la referencia, si trae uno, sería el
+número de **la tarjeta de la esposa**. La detección combina tres señales:
 
 1. El beneficiario calza con algún `alias_pago` de un instrumento `tipo = 'tc'`.
-2. El monto coincide (o casi) con el total de un ciclo cerrado sin pagar.
-3. La fecha cae cerca de `cicloPago()` de ese ciclo.
+2. La fecha cae cerca de `cicloPago()` de un ciclo cerrado sin pagar.
+3. El monto coincide con el total de ese ciclo.
 
 Con las tres, la app **propone** `clase = 'pago_tc'` con el ciclo
-preseleccionado. Con menos, cae a la bandeja sin clasificar. **Nunca se
-autoconfirma**: equivocarse aquí *es* el doble conteo.
+preseleccionado. Con las dos primeras pero **no** la tercera, igual lo
+propone — marcándolo como **pago parcial o con ajuste** (ver abajo). Con
+menos, cae a la bandeja sin clasificar. **Nunca se autoconfirma**:
+equivocarse aquí *es* el doble conteo.
 
 ### 2. El fijo que llega a la tarjeta
 
@@ -167,6 +180,45 @@ El run-rate ("a este ritmo") corre solo sobre el gasto **discrecional**: los
 `expenses` que **no** aparecen en esa tabla lateral. Si no, los fijos del
 ciclo se cuentan dos veces dentro del mismo ciclo.
 
+## El pago es manual: tres consecuencias
+
+No hay débito automático — David paga la tarjeta a mano, por PSE, todos los
+meses. Eso no es un detalle operativo: cambia tres cosas del modelo.
+
+### 1. La fecha real no es necesariamente el 30
+
+`cicloPago()` da el día 30 (o el último del mes). Eso sirve como
+**estimación** mientras el pago no ha ocurrido. Cuando llega el comprobante,
+el movimiento real entra con **su fecha real** y reemplaza al proyectado —
+no se ancla al 30. Pagar el 27 o el 2 del mes siguiente mueve el punto más
+apretado de la curva, que es justo lo que la pantalla debe mostrar.
+
+Implicación en el paso 4 del algoritmo: el reemplazo se busca por
+`ref_ciclo`, **nunca por fecha**. Si se emparejara por fecha, un pago hecho
+el 2 del mes siguiente quedaría como un gasto nuevo *además* del proyectado
+del 30 — doble conteo otra vez, por la puerta de atrás.
+
+### 2. El monto puede no ser el total del ciclo
+
+Un pago manual puede ser parcial (pago mínimo), o traer un ajuste. Si el
+monto del comprobante difiere del total del ciclo, la app **no asume nada**:
+marca el movimiento como pago parcial, lo registra por su monto real, y
+avisa que quedó un saldo sin pagar en ese ciclo. Ese remanente **no** se
+proyecta como deuda con intereses en v1 — se muestra como una advertencia y
+David decide. Modelar el rotativo de la tarjeta es otro alcance.
+
+### 3. Se puede olvidar — y eso la app sí lo puede vigilar
+
+Sin débito automático, no pagar es una posibilidad real. Como la app sabe
+cuándo cerró cada ciclo y no ha visto su comprobante, puede avisar:
+
+> *"El ciclo 2026-09 cerró el 15-sep y se paga el 30-sep. Todavía no
+> registro el pago."*
+
+Es de las alertas más útiles del módulo y sale gratis del modelo: un ciclo
+cerrado sin `flujo_movimientos` con ese `ref_ciclo`. Va en la fase 4, no
+espera a PSE — con la bandeja manual ya funciona.
+
 ## Modelo de datos
 
 Migración `0005_flujo_de_caja.sql`. **Solo `create table`.** RLS en todas
@@ -182,7 +234,9 @@ migración.
 
 ### `flujo_instrumentos`
 
-De dónde sale y a dónde entra la plata.
+De dónde sale y a dónde entra la plata. Ojo: `titular` es informativo y
+**no** implica quién paga — la TC tiene de titular a la esposa y la paga la
+cuenta de David. Ninguna vista debe derivar "quién paga" del titular.
 
 | columna | tipo | notas |
 |---|---|---|
@@ -370,7 +424,12 @@ interface Proyeccion {
    - **Ciclos futuros** → fijos-TC + promedio discrecional de los últimos 3
      ciclos.
    - **Si ya existe un `flujo_movimientos` con `tipo='pago_tc'` y ese
-     `ref_ciclo`** → el evento proyectado se **reemplaza**, no se suma.
+     `ref_ciclo`** → el evento proyectado se **reemplaza**, no se suma, y el
+     evento real va con **su fecha real**, no con `cicloPago()`. El
+     emparejamiento es por `ref_ciclo`, **nunca por fecha**.
+   - **Ciclo cerrado, pasada la fecha de pago, sin movimiento `pago_tc`** →
+     el evento sigue en la curva y se levanta la alerta de "pago sin
+     registrar".
 5. **Ordenar, acumular**, un punto de saldo por día.
 6. **Mínimo** de la serie y primer cruce bajo el colchón.
 
@@ -414,8 +473,11 @@ Antes de escribir `clasificar.ts`, David tiene que aportar correos reales
 (con datos tapados si quiere):
 
 - Un comprobante de pago PSE de un servicio.
-- **El comprobante del pago de la tarjeta de crédito** — es el que decide si
-  las tres señales del riesgo #1 son detectables o hay que pedirlo a mano.
+- **El comprobante del pago de la tarjeta de crédito** — el más importante.
+  Hay que ver exactamente cómo aparece el beneficiario (para `alias_pago`) y
+  si trae la referencia de la tarjeta. Ojo: la tarjeta es de la esposa, así
+  que la referencia podría ser un número que no está en ningún otro correo
+  de los que la app ya lee.
 - Si existen: transferencia enviada y abono de nómina.
 
 Sin eso cualquier regex es adivinanza — el mismo prerrequisito que ya se
@@ -437,6 +499,9 @@ Una entrada nueva en `TABS` de `components/NavTabs.tsx`, y todo lo demás en
   distinto de los reales.
 - **Lista por semana**, expandible a los eventos del día.
 - **Banner** si el mínimo cruza el colchón.
+- **Aviso de pago de tarjeta sin registrar** cuando un ciclo cerrado pasa su
+  fecha de pago sin un movimiento `pago_tc`. Como no hay débito automático,
+  este aviso es de los más útiles del módulo.
 - **Ajuste de saldo**: botón siempre visible; se vuelve un recordatorio
   activo pasados los días configurados, mostrando la deriva contra el ancla.
 
@@ -501,10 +566,16 @@ solo conectar el parser a una tubería ya probada.
 1. **¿Quién manda los comprobantes de PSE?** ¿El comercio, ACH Colombia, o
    Davibank? De ahí sale la lista de remitentes del query de Gmail, y es lo
    primero que hay que mirar en el buzón.
-2. **¿Pagas la tarjeta de Bancolombia por PSE?** Si sí, llega comprobante y
-   el riesgo #1 se detecta automático. Si es por débito automático o desde
-   la app de Bancolombia, ese pago **no genera correo** y hay que
-   registrarlo a mano cada mes — lo cual está bien, pero hay que saberlo y
-   ponerle un recordatorio.
+2. **⚠️ ¿Las alertas de compra de la tarjeta llegan *todas* al correo que ya
+   está conectado?** La tarjeta es de la esposa. Si el banco le manda a
+   ella alertas que David no ve, hay compras que la app nunca registra —
+   el total del ciclo queda subestimado y **el pago proyectado sale mal**.
+   Hasta ahora eso solo desajustaba el tope; con la proyección desajusta la
+   curva entera. Vale la pena cuadrar un mes contra el extracto real antes
+   de confiar en el número.
 3. **¿A qué cuenta te llega la nómina?** Define el instrumento por defecto de
    la regla de ingreso.
+4. **¿Alguna vez pagas menos del total de la tarjeta?** Si el pago siempre
+   es total, la advertencia de pago parcial es un caso borde que casi nunca
+   se dispara. Si es habitual, hay que modelar el rotativo y eso es otro
+   alcance.
