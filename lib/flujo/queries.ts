@@ -66,6 +66,21 @@ export async function guardarConfig(
  * El ancla más reciente: el saldo desde el que se reconstruye todo.
  * Solo el consolidado (instrumento_id nulo) — los saldos por instrumento
  * quedan para cuando haya vista por cuenta.
+ *
+ * El desempate no es cosmético. Re-anclar inserta otra fila con la misma
+ * `fecha` (ver `crearSaldo`), así que empatar es el caso normal, no el borde;
+ * y `flujo_saldos` no puede tener un único sobre (cuenta_id, fecha) sin
+ * romper ese diseño. Ordenando solo por `fecha`, Postgres devuelve una fila
+ * arbitraria —en la práctica la insertada primero, o sea la que el usuario
+ * acaba de corregir— y la app ignora el re-anclaje en silencio, después de
+ * haber dicho "Saldo actualizado".
+ *
+ * `created_at` es la intención (gana la última anclada). `id` va de último
+ * recurso: es un uuid v4, no ordena cronológicamente, pero convierte un
+ * empate indeterminado en uno estable entre recargas — `now()` es constante
+ * dentro de una transacción, así que dos filas insertadas juntas empatarían.
+ * Ninguna de las dos columnas necesita estar en el `select()`: el ORDER BY se
+ * aplica sobre la tabla, no sobre la proyección.
  */
 export async function ultimoSaldo(supabase: SupabaseClient): Promise<Resultado<Ancla>> {
   const { data, error } = await sinTipar(supabase)
@@ -73,6 +88,8 @@ export async function ultimoSaldo(supabase: SupabaseClient): Promise<Resultado<A
     .select("fecha, monto")
     .is("instrumento_id", null)
     .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
   return { data: data as Ancla | null, error };
