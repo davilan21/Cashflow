@@ -2,6 +2,7 @@
 
 import { Area, AreaChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { pesos, pesosCorto } from "@/lib/money";
+import { notaEvento } from "@/lib/flujo/etiquetas";
 import { CORTOS } from "@/lib/labels";
 import { diaDe, mesNum } from "@/lib/ciclo";
 import { escalaSaldo, indicesEquiespaciados } from "@/lib/flujo/escala";
@@ -50,7 +51,12 @@ function TooltipCurva({
         <ul className="mt-1.5 pt-1.5 border-t border-white/20 space-y-0.5">
           {delDia.slice(0, 4).map((e, i) => (
             <li key={i} className="flex gap-2 justify-between">
-              <span className="truncate opacity-80">{e.etiqueta}</span>
+              {/* Misma nota que la lista por semana: un solo dato, una sola
+                  verdad en las dos superficies donde se lee. */}
+              <span className="truncate opacity-80">
+                {e.etiqueta}
+                {notaEvento(e) && <span className="opacity-60"> · {notaEvento(e)}</span>}
+              </span>
               <span className="num shrink-0">
                 {e.monto > 0 ? "+" : "−"}
                 {pesosCorto(Math.abs(e.monto))}

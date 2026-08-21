@@ -107,9 +107,14 @@ export type TipoEvento =
   | "otro";
 
 /**
- * `real` ya ocurrió y está confirmado; `proyectado` sale de una regla o
- * amortización de monto conocido; `estimado` sale de una regla cuyo monto es
- * una aproximación (o del run-rate de la tarjeta), y se dibuja distinto.
+ * De dónde sale el MONTO, no si el movimiento ocurrió: `real` es un monto que
+ * ya no se mueve (el total de un ciclo cerrado, o una fila del libro de caja);
+ * `proyectado` sale de una regla o de una amortización de monto conocido;
+ * `estimado` es una aproximación (una regla estimada, o el run-rate de la
+ * tarjeta) y se dibuja distinto.
+ *
+ * OJO: `origen: 'real'` NO significa "ya pasó". El total de un ciclo cerrado y
+ * sin pagar es `real` y no ha ocurrido. Para el hecho está `registrado`.
  */
 export type OrigenEvento = "real" | "proyectado" | "estimado";
 
@@ -119,7 +124,16 @@ export interface EventoCaja {
   monto: number;
   tipo: TipoEvento;
   etiqueta: string;
+  /** La certeza del monto. Nunca el estado del hecho. */
   origen: OrigenEvento;
+  /**
+   * `true` solo si el evento sale de una fila de `flujo_movimientos`: alguien
+   * lo registró. Todo lo que la app asume —reglas, cuotas, y el pago de un
+   * ciclo cerrado que nadie ha pagado— va en `false`, por exacto que sea el
+   * monto. Es el campo que impide que un pago de tarjeta sin hacer se vea
+   * como hecho, que es el error más caro del módulo.
+   */
+  registrado: boolean;
   /** Regla, deuda o ciclo que lo originó. */
   refId?: string;
   /** La ocurrencia concreta: fecha programada en ISO, o el ciclo. */

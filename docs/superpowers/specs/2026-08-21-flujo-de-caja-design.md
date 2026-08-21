@@ -430,19 +430,47 @@ interface EventoCaja {
   tipo: 'ingreso' | 'gasto_fijo' | 'gasto' | 'pago_tc'
       | 'cuota_deuda' | 'aporte' | 'otro';
   etiqueta: string;
-  origen: 'real' | 'proyectado' | 'estimado';
+  origen: 'real' | 'proyectado' | 'estimado';  // la certeza del MONTO
+  registrado: boolean;   // si existe la fila en flujo_movimientos
   refId?: string;
+  refPeriodo?: string;
 }
 
 interface Proyeccion {
+  saldoHoy: number;
   eventos: EventoCaja[];
   serie: { fecha: string; saldo: number }[];   // un punto por día
-  minimo: { fecha: string; saldo: number };
-  saldoHoy: number;
+  minimo: { fecha: string; saldo: number };    // siempre un punto de `serie`
   bajoColchon: { fecha: string; saldo: number } | null;
-  derivaDesdeAncla: number | null;
+  ciclosSinPagar: string[];
 }
 ```
+
+**`origen` y `registrado` son ejes independientes.** `origen` dice qué tan
+firme es el monto; `registrado` dice si alguien lo anotó en el libro. El pago
+de un ciclo cerrado y sin pagar es `origen: 'real'` (el total ya no se mueve)
+y `registrado: false` (nadie lo pagó): es justo el par que no se puede
+colapsar en un campo, y colapsarlo es el riesgo #1 mostrado en pantalla como
+"confirmado". Ojo con el nombre: `EventoCaja.origen` **no** es el `origen` de
+`flujo_movimientos`/`flujo_saldos`, que vale `'manual' | 'correo'` y describe
+cómo entró el dato.
+
+La nota que se le muestra al usuario sale de `notaEvento()` en
+`lib/flujo/etiquetas.ts`, y la usan por igual la lista por semana y el tooltip
+de la curva. Dice "registrado", no "confirmado": un movimiento puede tener
+fecha futura (anotar hoy un pago programado para el 30), así que afirmar que
+ya ocurrió sería el mismo error en la dirección contraria — y "confirmado" ya
+es el estado de `flujo_pendientes`.
+
+**La deriva contra el ancla no la devuelve el motor.** Se calcula en
+`SaldoModal` al re-anclar, contra el saldo que el usuario teclea: el motor no
+conoce el saldo real del banco, así que no puede compararse con nada.
+
+**El saldo de hoy incluye los movimientos con fecha de hoy** —ya salieron del
+banco— y los deja fuera de la curva de lo que viene. Los compromisos
+*proyectados* de hoy, en cambio, sí van en la curva y no en el saldo: el
+header no puede afirmar que el arriendo de hoy ya salió. Esa asimetría es
+deliberada.
 
 ### Algoritmo
 
@@ -469,7 +497,9 @@ interface Proyeccion {
 4. **Calcular el pago de TC de cada ciclo** del horizonte, leyendo
    `expenses`:
    - **Ciclo cerrado y no pagado** → total real, evento en `cicloPago()`,
-     origen `real`.
+     `origen: 'real'` y **`registrado: false`**. El monto es final; el pago no
+     está hecho. La UI lo dice así ("monto final, sin registrar"), nunca
+     "confirmado".
    - **Ciclo en curso** → real hasta hoy + fijos-TC del ciclo aún no
      cobrados + run-rate discrecional × días restantes. El run-rate
      discrecional excluye los `expenses` emparejados en

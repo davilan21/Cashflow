@@ -1,7 +1,7 @@
 /** Textos legibles para el módulo de flujo. */
 
 import { MESES } from "@/lib/labels";
-import type { Frecuencia, Regla, TipoRegla } from "./tipos";
+import type { EventoCaja, Frecuencia, Regla, TipoRegla } from "./tipos";
 
 export const TIPOS_REGLA: { id: TipoRegla; etiqueta: string }[] = [
   { id: "ingreso", etiqueta: "Ingreso" },
@@ -68,4 +68,26 @@ export function resumenRegla(regla: Regla): string {
 export function notaMedioPago(regla: Regla): string | null {
   if (regla.tipo !== "gasto_fijo" || regla.medio_pago !== "tc") return null;
   return "Va a la tarjeta: sale de la caja el día que pagas el ciclo";
+}
+
+/**
+ * La nota corta que acompaña a un evento en la lista y en el tooltip.
+ *
+ * El HECHO manda sobre la certeza del monto. Un pago de tarjeta de un ciclo
+ * cerrado tiene el total exacto y aun así nadie lo ha pagado: rotularlo
+ * "confirmado" es lo que hace que alguien no pague la tarjeta, y es el error
+ * más caro del módulo.
+ *
+ * Dice "registrado", no "confirmado", por dos razones: `registrado` incluye
+ * movimientos con fecha futura (anotar hoy un pago programado para el 30),
+ * así que afirmar que ya ocurrió sería el mismo error al revés; y
+ * "confirmado" ya es el estado de la bandeja de pendientes.
+ */
+export function notaEvento(evento: EventoCaja): string | null {
+  if (evento.registrado) return "registrado";
+  if (evento.origen === "estimado") return "estimado";
+  // Solo el pago de tarjeta se anuncia sin registrar: es el único que exige
+  // que el usuario haga algo. Un arriendo proyectado no necesita aviso.
+  if (evento.tipo === "pago_tc") return "monto final, sin registrar";
+  return null;
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CurvaSaldo } from "./CurvaSaldo";
 import { Button } from "@/components/ui/Button";
 import { pesos } from "@/lib/money";
+import { notaEvento } from "@/lib/flujo/etiquetas";
 import { CORTOS, etiquetaPago, MESES } from "@/lib/labels";
 import { diaDe, diasEntre, mesNum, sumarDias } from "@/lib/ciclo";
 import type { EventoCaja, Proyeccion as TipoProyeccion } from "@/lib/flujo/tipos";
@@ -173,8 +174,7 @@ export function Proyeccion({
                         <span className="block truncate">{e.etiqueta}</span>
                         <span className="block text-[11px] text-muted">
                           {fechaCorta(e.fecha)} · {SIGNOS[e.tipo]}
-                          {e.origen === "estimado" && " · estimado"}
-                          {e.origen === "real" && " · confirmado"}
+                          {notaEvento(e) && ` · ${notaEvento(e)}`}
                         </span>
                       </span>
                       <span className={`num shrink-0 ${e.monto > 0 ? "text-ok" : "text-ink"}`}>

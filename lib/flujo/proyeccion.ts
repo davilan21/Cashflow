@@ -130,6 +130,7 @@ export function expandirReglas(reglas: Regla[], desde: string, hasta: string, co
         tipo,
         etiqueta: regla.nombre,
         origen: regla.monto_tipo === "estimado" ? "estimado" : "proyectado",
+        registrado: false,
         refId: regla.id,
         refPeriodo: fecha,
       });
@@ -153,6 +154,7 @@ export function expandirDeudas(deudas: Deuda[], desde: string, hasta: string, co
         tipo: "cuota_deuda",
         etiqueta: `${deuda.nombre} · cuota ${cuota.numero}`,
         origen: "proyectado",
+        registrado: false,
         refId: deuda.id,
         refPeriodo: cuota.fecha,
       });
@@ -201,7 +203,9 @@ function fijosTcPendientes(reglas: Regla[], gastos: GastoTarjeta[], ciclo: strin
 /**
  * Un evento de caja por cada ciclo de tarjeta cuyo pago cae en la ventana.
  *
- * - Ciclo cerrado y no pagado → el total real, en su fecha de pago.
+ * - Ciclo cerrado y no pagado → el total real, en su fecha de pago. El monto
+ *   es final (`origen: 'real'`) pero el pago NO está hecho: va con
+ *   `registrado: false`. Confundir las dos cosas es el riesgo #1 del módulo.
  * - Ciclo en curso → lo real hasta hoy, más los fijos que faltan, más el
  *   ritmo discrecional por los días que quedan.
  * - Ciclos futuros → los fijos del ciclo más el promedio discrecional reciente.
@@ -272,6 +276,10 @@ export function eventosPagoTarjeta(
         tipo: "pago_tc",
         etiqueta: `Pago tarjeta · ciclo ${ciclo}`,
         origen,
+        // Nunca registrado: la rama de arriba ya descartó los ciclos pagados,
+        // así que todo lo que sale de acá es un pago que no está hecho —
+        // incluido el del ciclo cerrado, cuyo monto sí es final.
+        registrado: false,
         refId: ciclo,
         refPeriodo: ciclo,
       });
@@ -317,9 +325,18 @@ export function proyectar(entrada: EntradaProyeccion): Proyeccion {
   const desdeAncla = ancla ? sumarDias(ancla.fecha, 1) : hoy;
   const ayer = sumarDias(hoy, -1);
 
-  const realesPrevios = ancla
-    ? movimientos.filter((m) => m.fecha >= desdeAncla && m.fecha < hoy).reduce((s, m) => s + m.monto, 0)
-    : 0;
+  // Hasta HOY INCLUSIVE: un movimiento confirmado con fecha de hoy ya salió
+  // del banco, así que pertenece al saldo de hoy y no a la curva de lo que
+  // viene. Sin ternario a propósito: cuando no hay ancla, `desdeAncla` vale
+  // `hoy` y el filtro recoge justo los movimientos de hoy, en vez de dejarlos
+  // fuera de los dos lados del corte y perderlos.
+  //
+  // Cuando el ancla cierra HOY, `desdeAncla` es mañana y el rango queda vacío
+  // por construcción: los movimientos de hoy ya están dentro del ancla y
+  // volver a restarlos hundiría la curva entera.
+  const realesPrevios = movimientos
+    .filter((m) => m.fecha >= desdeAncla && m.fecha <= hoy)
+    .reduce((s, m) => s + m.monto, 0);
 
   const asumidosPrevios =
     ancla && desdeAncla <= ayer
@@ -335,13 +352,17 @@ export function proyectar(entrada: EntradaProyeccion): Proyeccion {
   // --- Eventos de la ventana hacia adelante -------------------------------
   const eventos = [
     ...movimientos
-      .filter((m) => m.fecha >= hoy && m.fecha <= hasta)
+      // Estrictamente DESPUÉS de hoy: los de hoy ya los absorbió `saldoHoy`.
+      // Contarlos también acá los sumaría dos veces al primer punto de la
+      // serie, y el header contradiría a la curva por ese monto.
+      .filter((m) => m.fecha > hoy && m.fecha <= hasta)
       .map<EventoCaja>((m) => ({
         fecha: m.fecha,
         monto: m.monto,
         tipo: m.tipo === "transferencia" || m.tipo === "otro" ? "otro" : m.tipo,
         etiqueta: m.etiqueta,
         origen: "real",
+        registrado: true,
         refId: m.ref_id ?? undefined,
         refPeriodo: m.ref_periodo ?? undefined,
       })),
@@ -356,14 +377,18 @@ export function proyectar(entrada: EntradaProyeccion): Proyeccion {
 
   const serie: PuntoSaldo[] = [];
   let saldo = saldoHoy;
-  let minimo: PuntoSaldo = { fecha: hoy, saldo: saldoHoy };
+  // El mínimo se siembra con el primer punto que produce el bucle, nunca con
+  // { hoy, saldoHoy }: ese par no pertenece a la serie cuando hoy trae
+  // eventos proyectados, y el marcador del punto más apretado terminaba
+  // dibujado fuera de la línea, sobre un saldo que la curva nunca toca.
+  let minimo: PuntoSaldo | null = null;
   let bajoColchon: PuntoSaldo | null = null;
 
   for (let f = hoy; f <= hasta; f = sumarDias(f, 1)) {
     saldo += porDia.get(f) ?? 0;
     const punto = { fecha: f, saldo };
     serie.push(punto);
-    if (saldo < minimo.saldo) minimo = punto;
+    if (minimo === null || saldo < minimo.saldo) minimo = punto;
     if (bajoColchon === null && saldo < colchon) bajoColchon = punto;
   }
 
@@ -371,7 +396,10 @@ export function proyectar(entrada: EntradaProyeccion): Proyeccion {
     saldoHoy,
     eventos,
     serie,
-    minimo,
+    // El respaldo cae en `serie[0]`, no en `{ hoy, saldoHoy }`: ese par es
+    // justo el que podía no pertenecer a la curva. Así el invariante "el
+    // punto más apretado está sobre la línea" se cumple por construcción.
+    minimo: minimo ?? serie[0],
     bajoColchon,
     ciclosSinPagar: ciclosSinPagar(gastosTarjeta, pagados, hoy),
   };

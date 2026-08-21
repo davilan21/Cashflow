@@ -165,12 +165,20 @@ describe("expandirDeudas", () => {
 });
 
 describe("eventosPagoTarjeta", () => {
-  it("un ciclo cerrado y sin pagar sale por su total real, el día de pago", () => {
+  it("un ciclo cerrado y sin pagar tiene monto final pero NO está registrado", () => {
     // Ciclo 2026-08 = 16 jul a 15 ago, se paga el 30 de agosto.
+    // Los dos ejes son independientes y este es el caso que los separa: el
+    // total ya no se mueve (origen 'real'), pero nadie ha pagado nada.
+    // Confundirlos es el riesgo #1 del módulo.
     const gastos = [gasto("2026-07-20", 1_000_000), gasto("2026-08-10", 500_000)];
     const eventos = eventosPagoTarjeta(gastos, [], VACIO, "2026-08-20", "2026-08-20", "2026-09-10");
     expect(eventos).toHaveLength(1);
-    expect(eventos[0]).toMatchObject({ fecha: "2026-08-30", monto: -1_500_000, origen: "real" });
+    expect(eventos[0]).toMatchObject({
+      fecha: "2026-08-30",
+      monto: -1_500_000,
+      origen: "real",
+      registrado: false,
+    });
   });
 
   it("un ciclo ya pagado no genera evento proyectado", () => {
@@ -185,6 +193,7 @@ describe("eventosPagoTarjeta", () => {
     const eventos = eventosPagoTarjeta(gastos, [], VACIO, "2026-08-20", "2026-09-20", "2026-10-05");
     const ciclo = eventos.find((e) => e.refId === "2026-09");
     expect(ciclo?.origen).toBe("estimado");
+    expect(ciclo?.registrado).toBe(false);
     expect(ciclo?.monto).toBe(-(500_000 + 100_000 * 26));
   });
 
@@ -337,7 +346,12 @@ describe("proyectar", () => {
     );
     const pagos = p.eventos.filter((e) => e.tipo === "pago_tc");
     expect(pagos).toHaveLength(1);
-    expect(pagos[0]).toMatchObject({ fecha: "2026-09-02", monto: -1_500_000, origen: "real" });
+    expect(pagos[0]).toMatchObject({
+      fecha: "2026-09-02",
+      monto: -1_500_000,
+      origen: "real",
+      registrado: true,
+    });
   });
 
   it("los gastos del ciclo colapsan en un solo evento el día de pago", () => {
@@ -373,5 +387,220 @@ describe("proyectar", () => {
     );
     const fechas = p.eventos.map((e) => e.fecha);
     expect([...fechas].sort()).toEqual(fechas);
+  });
+});
+
+// --- Coherencia entre el saldo de hoy y el arranque de la curva -------------
+//
+// El header responde "¿cuánta plata tengo AHORA?" y el primer punto de la
+// curva es el cierre de hoy. Los dos números se muestran juntos, así que no
+// pueden contradecirse por un movimiento que ya está confirmado.
+
+describe("saldoHoy contra el arranque de la curva", () => {
+  function movimiento(cambios: Partial<Movimiento> = {}): Movimiento {
+    return {
+      id: "m1",
+      fecha: "2026-08-20",
+      monto: -300_000,
+      tipo: "gasto",
+      etiqueta: "Mercado",
+      ref_ciclo: null,
+      ref_id: null,
+      ref_periodo: null,
+      ...cambios,
+    };
+  }
+
+  it("un movimiento confirmado hoy ya está en el saldo de hoy", () => {
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-21",
+        ancla: { fecha: "2026-08-20", monto: 1_000_000 },
+        movimientos: [movimiento({ fecha: "2026-08-21" })],
+      })
+    );
+    expect(p.saldoHoy).toBe(700_000);
+    expect(p.serie[0].saldo).toBe(p.saldoHoy);
+  });
+
+  it("el ancla del mismo día ya incluye los movimientos de ese día", () => {
+    // El ancla es el saldo al CIERRE de su fecha: si cierra hoy, el gasto de
+    // hoy ya está adentro. Volver a restarlo hunde la curva entera.
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-21",
+        ancla: { fecha: "2026-08-21", monto: 1_000_000 },
+        movimientos: [movimiento({ fecha: "2026-08-21" })],
+      })
+    );
+    expect(p.saldoHoy).toBe(1_000_000);
+    expect(p.serie[0].saldo).toBe(p.saldoHoy);
+  });
+
+  it("sin ancla, el movimiento de hoy no se pierde", () => {
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-21",
+        ancla: null,
+        movimientos: [movimiento({ fecha: "2026-08-21" })],
+      })
+    );
+    expect(p.saldoHoy).toBe(-300_000);
+    expect(p.serie[0].saldo).toBe(p.saldoHoy);
+  });
+
+  it("la cuota confirmada hoy no se suma además de proyectarse", () => {
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-05",
+        ancla: { fecha: "2026-08-04", monto: 1_000_000 },
+        reglas: [regla({ id: "r1", monto: 2_000_000, dia_1: 5 })],
+        movimientos: [
+          movimiento({ fecha: "2026-08-05", monto: -2_000_000, ref_id: "r1", ref_periodo: "2026-08-05" }),
+        ],
+        horizonteDias: 10,
+      })
+    );
+    expect(p.saldoHoy).toBe(-1_000_000);
+    expect(p.serie[0].saldo).toBe(p.saldoHoy);
+    expect(p.eventos.filter((e) => e.refId === "r1")).toHaveLength(0);
+  });
+
+  it("el pago de tarjeta registrado hoy entra al saldo, no a la curva futura", () => {
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-30",
+        ancla: { fecha: "2026-08-29", monto: 5_000_000 },
+        horizonteDias: 30,
+        gastosTarjeta: [gasto("2026-07-20", 1_500_000)],
+        movimientos: [
+          movimiento({
+            fecha: "2026-08-30",
+            monto: -1_500_000,
+            tipo: "pago_tc",
+            etiqueta: "Pago TC",
+            ref_ciclo: "2026-08",
+          }),
+        ],
+      })
+    );
+    expect(p.saldoHoy).toBe(3_500_000);
+    expect(p.serie[0].saldo).toBe(p.saldoHoy);
+    expect(p.eventos.filter((e) => e.tipo === "pago_tc")).toHaveLength(0);
+    expect(p.ciclosSinPagar).toEqual([]);
+  });
+
+  it("el compromiso proyectado de hoy va en la curva, no en el saldo de hoy", () => {
+    // La asimetría es deliberada: un gasto confirmado ya salió del banco; el
+    // arriendo proyectado de hoy quizá salga esta tarde. El header no puede
+    // afirmar que ya salió.
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-05",
+        ancla: { fecha: "2026-08-04", monto: 1_000_000 },
+        reglas: [regla({ monto: 2_000_000, dia_1: 5 })],
+        horizonteDias: 10,
+      })
+    );
+    expect(p.saldoHoy).toBe(1_000_000);
+    expect(p.serie[0].saldo).toBe(-1_000_000);
+  });
+
+  it("el punto más apretado siempre pertenece a la curva", () => {
+    // El mínimo se sembraba con { hoy, saldoHoy }, que no es un punto de la
+    // serie: con un ingreso el día de hoy, el marcador quedaba flotando fuera
+    // de la línea y el header anunciaba un saldo que la curva nunca toca.
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-05",
+        ancla: { fecha: "2026-08-04", monto: 1_000_000 },
+        reglas: [regla({ tipo: "ingreso", monto: 4_000_000, dia_1: 5, medio_pago: null })],
+        horizonteDias: 10,
+      })
+    );
+    expect(p.serie).toContainEqual(p.minimo);
+  });
+});
+
+// --- El hecho, separado de la certeza del monto -----------------------------
+//
+// `origen` dice de dónde sale el MONTO; `registrado` dice si alguien lo anotó
+// en el libro de caja. El pago de un ciclo cerrado tiene monto exacto y no
+// está hecho: es justo el par que no se puede colapsar en un solo campo.
+
+describe("registrado", () => {
+  it("solo los eventos que salen de flujo_movimientos van registrados", () => {
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-20",
+        horizonteDias: 40,
+        reglas: [regla({ monto: 2_000_000, dia_1: 5 })],
+        gastosTarjeta: [gasto("2026-07-20", 1_500_000)],
+        movimientos: [
+          {
+            id: "m1",
+            fecha: "2026-08-25",
+            monto: -100_000,
+            tipo: "gasto",
+            etiqueta: "Mercado",
+            ref_ciclo: null,
+            ref_id: null,
+            ref_periodo: null,
+          },
+        ],
+      })
+    );
+    const registrados = p.eventos.filter((e) => e.registrado);
+    expect(registrados).toHaveLength(1);
+    expect(registrados[0].etiqueta).toBe("Mercado");
+  });
+
+  it("un movimiento con fecha futura ya está registrado aunque no haya ocurrido", () => {
+    // Por eso el campo se llama `registrado` y no `ocurrido`: lo único que la
+    // app puede afirmar es que existe la fila, no que el dinero ya se movió.
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-20",
+        horizonteDias: 30,
+        movimientos: [
+          {
+            id: "m1",
+            fecha: "2026-08-30",
+            monto: -100_000,
+            tipo: "gasto",
+            etiqueta: "Pago programado",
+            ref_ciclo: null,
+            ref_id: null,
+            ref_periodo: null,
+          },
+        ],
+      })
+    );
+    expect(p.eventos.find((e) => e.etiqueta === "Pago programado")?.registrado).toBe(true);
+  });
+
+  it("un pago parcial registrado no resucita el evento proyectado del ciclo", () => {
+    const p = proyectar(
+      entrada({
+        hoy: "2026-08-25",
+        horizonteDias: 30,
+        gastosTarjeta: [gasto("2026-07-20", 1_500_000)],
+        movimientos: [
+          {
+            id: "m1",
+            fecha: "2026-08-30",
+            monto: -1_000_000,
+            tipo: "pago_tc",
+            etiqueta: "Abono TC",
+            ref_ciclo: "2026-08",
+            ref_id: null,
+            ref_periodo: null,
+          },
+        ],
+      })
+    );
+    const pagos = p.eventos.filter((e) => e.tipo === "pago_tc");
+    expect(pagos).toHaveLength(1);
+    expect(pagos[0]).toMatchObject({ monto: -1_000_000, registrado: true });
   });
 });
