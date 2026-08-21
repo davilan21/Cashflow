@@ -14,6 +14,7 @@ function deuda(cambios: Partial<Deuda> = {}): Deuda {
     cuotas_pagadas: 12,
     dia_pago: 10,
     medio_pago: "debito",
+    instrumento_id: null,
     activa: true,
     ...cambios,
   };

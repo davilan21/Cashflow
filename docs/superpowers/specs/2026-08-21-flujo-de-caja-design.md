@@ -597,7 +597,7 @@ CRUD de reglas, deudas e instrumentos.
 | # | Fase | Contenido |
 |---|---|---|
 | 1 | **Cimientos** ✅ | Migración `0005` (solo `create table`) + `lib/flujo/tipos.ts`, `deuda.ts` y `proyeccion.ts` con 52 pruebas. Sin UI. **Hecha.** |
-| 2 | **Compromisos** | Pestaña Flujo con el CRUD de reglas e instrumentos. |
+| 2 | **Compromisos** ✅ | Pestaña Flujo con el CRUD de reglas e instrumentos, validación espejo de los CHECK y 13 pruebas. **Hecha.** |
 | 3 | **Deudas** | CRUD de deudas + amortización visible + confirmación manual de cuotas. Sin detección por correo, ni ahora ni en la fase 6. |
 | 4 | **Proyección** | Curva de 90 días, mínimo, colchón, lista por semana, semilla y ajuste de saldo. **Aquí ya es útil, sin PSE.** |
 | 5 | **Bandeja manual** | `flujo_pendientes` + `confirmar_flujo_pendiente()` + UI, alimentada **a mano**. Prueba el ruteo por clase y el reemplazo del pago de TC sin depender de ningún correo. |

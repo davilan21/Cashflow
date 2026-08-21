@@ -28,6 +28,7 @@ export interface Regla {
   mes: number | null;
   /** Solo aplica a gasto_fijo. */
   medio_pago: MedioPago | null;
+  instrumento_id: string | null;
   categoria: string | null;
   desde: string;
   hasta: string | null;
@@ -47,6 +48,7 @@ export interface Deuda {
   cuotas_pagadas: number;
   dia_pago: number;
   medio_pago: MedioPago;
+  instrumento_id: string | null;
   activa: boolean;
 }
 

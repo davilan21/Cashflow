@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/registro", label: "Registro" },
   { href: "/pendientes", label: "Pendientes" },
+  { href: "/flujo", label: "Flujo" },
   { href: "/historial", label: "Historial" },
   { href: "/cuenta", label: "Cuenta" },
 ] as const;
@@ -22,7 +23,7 @@ export function NavTabs({ pendientesCount = 0 }: { pendientesCount?: number }) {
             <Link
               key={t.href}
               href={t.href}
-              className={`flex-1 text-center py-2 rounded-lg text-sm ${
+              className={`flex-1 text-center py-2 px-0.5 rounded-lg text-xs sm:text-sm truncate ${
                 activo ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted"
               }`}
             >

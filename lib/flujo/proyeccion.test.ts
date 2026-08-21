@@ -23,6 +23,7 @@ function regla(cambios: Partial<Regla> = {}): Regla {
     dia_2: null,
     mes: null,
     medio_pago: "debito",
+    instrumento_id: null,
     categoria: null,
     desde: "2026-01-01",
     hasta: null,
@@ -146,6 +147,7 @@ describe("expandirDeudas", () => {
     cuotas_pagadas: 12,
     dia_pago: 10,
     medio_pago: "debito",
+    instrumento_id: null,
     activa: true,
   };
 
