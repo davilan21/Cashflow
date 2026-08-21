@@ -310,6 +310,7 @@ historial de la deriva entre anclas.
 | `instrumento_id` | uuid, null | |
 | `ref_ciclo` | text, null | para `pago_tc`: qué ciclo se pagó |
 | `ref_id` | uuid, null | regla o deuda que lo originó |
+| `ref_periodo` | text, null | de qué ocurrencia se trata (la fecha programada, en ISO). Con `ref_id` forma la llave que impide reproyectar algo ya confirmado |
 | `created_by`, `created_at` | | |
 
 Aquí viven también los gastos de débito (`tipo = 'gasto'`, monto negativo).
@@ -595,7 +596,7 @@ CRUD de reglas, deudas e instrumentos.
 
 | # | Fase | Contenido |
 |---|---|---|
-| 1 | **Cimientos** | Migración `0005` (solo `create table`) + `lib/flujo/proyeccion.ts` y `lib/flujo/deuda.ts` con tests. Sin UI. |
+| 1 | **Cimientos** ✅ | Migración `0005` (solo `create table`) + `lib/flujo/tipos.ts`, `deuda.ts` y `proyeccion.ts` con 52 pruebas. Sin UI. **Hecha.** |
 | 2 | **Compromisos** | Pestaña Flujo con el CRUD de reglas e instrumentos. |
 | 3 | **Deudas** | CRUD de deudas + amortización visible + confirmación manual de cuotas. Sin detección por correo, ni ahora ni en la fase 6. |
 | 4 | **Proyección** | Curva de 90 días, mínimo, colchón, lista por semana, semilla y ajuste de saldo. **Aquí ya es útil, sin PSE.** |
@@ -620,8 +621,12 @@ solo conectar el parser a una tubería ya probada.
   enteros, nunca con `Date` local. "Hoy" siempre en `America/Bogota`.
 - Nunca sobrescribir datos que no se pudieron leer: si falla la carga, la
   pantalla queda de solo lectura con aviso y reintento.
-- Revisión obligatoria: nada entra a `flujo_movimientos` sin pasar por
-  `confirmar_flujo_pendiente()`.
+- Revisión obligatoria para lo que viene de un correo: nada detectado en un
+  buzón entra a `flujo_movimientos` sin pasar por
+  `confirmar_flujo_pendiente()`. Los registros a mano (confirmar una cuota,
+  anotar el pago de la tarjeta) sí insertan directo — RLS los limita a la
+  cuenta, igual que hace `expenses` hoy. Lo que el trigger garantiza es que
+  un pendiente **nunca** pase a `confirmado` sin haber creado su movimiento.
 
 ## Preguntas abiertas
 
