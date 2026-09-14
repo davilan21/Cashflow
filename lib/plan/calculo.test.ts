@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rangoMeses, rubroAplica, lineasDe, estadoCiclo, totalCiclo, promedioCiclosCerrados, calcularTC } from "./calculo";
+import { rangoMeses, rubroAplica, lineasDe, estadoCiclo, totalCiclo, promedioCiclosCerrados, calcularTC, calcularPlan } from "./calculo";
 import type { PlanRubro, PlanAjuste, Expense } from "@/lib/types";
 
 // Fábricas: solo lo que importa para el cálculo; el resto es relleno fijo.
@@ -179,5 +179,60 @@ describe("calcularTC", () => {
     expect(calcularTC(gastos, [ajuste("2026-10", null, 1)], "2026-10", hoy).origenReferencia).toBe("ritmo");
     expect(calcularTC(gastos, [ajuste("2026-11", null, 1)], "2026-11", hoy).origenReferencia).toBe("promedio");
     expect(calcularTC([], [ajuste("2026-11", null, 1)], "2026-11", hoy).origenReferencia).toBe("sin_datos");
+  });
+});
+
+describe("calcularPlan", () => {
+  const hoy = "2026-09-20";
+  const rubros = [
+    rubro({ id: "nomina", tipo: "ingreso", monto_default: 10_000_000, desde: "2026-01" }),
+    rubro({ id: "arriendo", tipo: "fijo", monto_default: 2_000_000, desde: "2026-01" }),
+  ];
+  // Un solo ciclo cerrado con datos: promedio = 3M para todo futuro.
+  const gastos = [gasto("2026-08-01", 3_000_000)];
+
+  it("10 meses, el actual marcado", () => {
+    const plan = calcularPlan({ rubros, ajustes: [], gastos, hoy });
+    expect(plan).toHaveLength(10);
+    expect(plan.filter((m) => m.esActual).map((m) => m.mes)).toEqual(["2026-09"]);
+  });
+
+  it("ahorro = ingresos − fijos − tc, negativo permitido", () => {
+    const plan = calcularPlan({ rubros, ajustes: [], gastos, hoy });
+    const nov = plan.find((m) => m.mes === "2026-11")!;
+    expect(nov.totalIngresos).toBe(10_000_000);
+    expect(nov.totalFijos).toBe(2_000_000);
+    expect(nov.tc.monto).toBe(3_000_000);
+    expect(nov.ahorro).toBe(5_000_000);
+
+    const caro = calcularPlan({ rubros, ajustes: [ajuste("2026-11", null, 20_000_000)], gastos, hoy });
+    expect(caro.find((m) => m.mes === "2026-11")!.ahorro).toBe(-12_000_000);
+  });
+
+  it("acumulado: null en pasados, = ahorro en el actual, suma hacia adelante", () => {
+    const plan = calcularPlan({ rubros, ajustes: [], gastos, hoy });
+    const [jun, jul, ago, sep, oct] = plan;
+    expect(jun.acumulado).toBeNull();
+    expect(jul.acumulado).toBeNull();
+    expect(ago.acumulado).toBeNull();
+    expect(sep.acumulado).toBe(sep.ahorro);
+    expect(oct.acumulado).toBe(sep.ahorro! + oct.ahorro!);
+  });
+
+  it("sin rubros de ingreso: ahorro null, acumulado null", () => {
+    const plan = calcularPlan({ rubros: [rubros[1]], ajustes: [], gastos, hoy });
+    expect(plan.every((m) => m.ahorro === null)).toBe(true);
+    expect(plan.every((m) => m.acumulado === null)).toBe(true);
+  });
+
+  it("un ingreso que arranca en el futuro: los meses anteriores quedan en null y el acumulado arranca ahí", () => {
+    const tardio = [rubro({ id: "nomina", tipo: "ingreso", monto_default: 10_000_000, desde: "2026-11" })];
+    const plan = calcularPlan({ rubros: tardio, ajustes: [], gastos, hoy });
+    const sep = plan.find((m) => m.mes === "2026-09")!;
+    const nov = plan.find((m) => m.mes === "2026-11")!;
+    expect(sep.ahorro).toBeNull();
+    expect(sep.acumulado).toBeNull();
+    expect(nov.ahorro).toBe(7_000_000);
+    expect(nov.acumulado).toBe(7_000_000);
   });
 });

@@ -113,3 +113,56 @@ export function calcularTC(gastos: Expense[], ajustes: PlanAjuste[], mes: string
   if (promedio === null) return { monto: 0, origen: "sin_datos", editable: true, ciclo, referencia: 0, origenReferencia };
   return { monto: promedio, origen: "promedio", editable: true, ciclo, referencia, origenReferencia };
 }
+
+export interface MesPlan {
+  mes: string;
+  esActual: boolean;
+  ingresos: LineaPlan[];
+  fijos: LineaPlan[];
+  totalIngresos: number;
+  totalFijos: number;
+  tc: TCPlan;
+  /** null si no hay ningún rubro de ingreso vigente: la UI muestra "—". */
+  ahorro: number | null;
+  /** Suma de ahorros desde el mes actual (incluido). null en meses pasados. */
+  acumulado: number | null;
+}
+
+const suma = (lineas: LineaPlan[]) => lineas.reduce((s, l) => s + l.monto, 0);
+
+export function calcularPlan(opts: {
+  rubros: PlanRubro[];
+  ajustes: PlanAjuste[];
+  gastos: Expense[];
+  hoy: string;
+  mesesAtras?: number;
+  mesesAdelante?: number;
+}): MesPlan[] {
+  const { rubros, ajustes, gastos, hoy, mesesAtras = 3, mesesAdelante = 6 } = opts;
+  const mesActual = mesDe(hoy);
+  let acumulado: number | null = null;
+
+  return rangoMeses(hoy, mesesAtras, mesesAdelante).map((mes) => {
+    const ingresos = lineasDe(rubros, ajustes, mes, "ingreso");
+    const fijos = lineasDe(rubros, ajustes, mes, "fijo");
+    const totalIngresos = suma(ingresos);
+    const totalFijos = suma(fijos);
+    const tc = calcularTC(gastos, ajustes, mes, hoy);
+    const ahorro = ingresos.length === 0 ? null : totalIngresos - totalFijos - tc.monto;
+
+    const esActual = mes === mesActual;
+    if (mes >= mesActual && ahorro !== null) acumulado = (acumulado ?? 0) + ahorro;
+
+    return {
+      mes,
+      esActual,
+      ingresos,
+      fijos,
+      totalIngresos,
+      totalFijos,
+      tc,
+      ahorro,
+      acumulado: mes < mesActual ? null : acumulado,
+    };
+  });
+}
