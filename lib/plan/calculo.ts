@@ -1,5 +1,6 @@
-import { desplazarMes, mesDe } from "@/lib/ciclo";
-import type { PlanAjuste, PlanRubro, TipoRubro } from "@/lib/types";
+import { cicloDe, cicloFin, cicloInicio, desplazarMes, diasCorridosEnRango, diasEntre, mesDe } from "@/lib/ciclo";
+import type { Expense, PlanAjuste, PlanRubro, TipoRubro } from "@/lib/types";
+import type { OrigenTC } from "./etiquetas";
 
 export interface LineaPlan {
   rubroId: string;
@@ -37,4 +38,78 @@ export function lineasDe(rubros: PlanRubro[], ajustes: PlanAjuste[], mes: string
         ajustado: Boolean(aj),
       };
     });
+}
+
+export type EstadoCiclo = "cerrado" | "en_curso" | "no_iniciado";
+
+export interface TCPlan {
+  monto: number;
+  origen: OrigenTC;
+  editable: boolean;
+  ciclo: string;
+  /** El valor sin ajuste manual (factura, ritmo o promedio). */
+  referencia: number;
+  /** Cuál de los tres es la referencia. Igual a `origen` salvo cuando hay ajuste manual. */
+  origenReferencia: Exclude<OrigenTC, "manual">;
+}
+
+/** El ciclo del mes M es M: cierra el 15 de M y se paga el 30 de M. */
+export function estadoCiclo(ciclo: string, hoy: string): EstadoCiclo {
+  if (hoy > cicloFin(ciclo)) return "cerrado";
+  if (hoy < cicloInicio(ciclo)) return "no_iniciado";
+  return "en_curso";
+}
+
+export function totalCiclo(gastos: Expense[], ciclo: string): number {
+  return gastos.filter((g) => cicloDe(g.fecha) === ciclo).reduce((s, g) => s + g.monto, 0);
+}
+
+/**
+ * Promedio de los últimos `n` ciclos cerrados con gasto > 0. Un ciclo cerrado
+ * en cero no cuenta (no arrastra el promedio hacia abajo). null si no hay
+ * ninguno con datos.
+ */
+export function promedioCiclosCerrados(gastos: Expense[], hoy: string, n = 3): number | null {
+  if (gastos.length === 0) return null;
+  const cicloMin = gastos.map((g) => cicloDe(g.fecha)).sort()[0];
+  const totales: number[] = [];
+  let c = desplazarMes(cicloDe(hoy), -1); // el anterior al que contiene hoy: el primero cerrado
+  while (c >= cicloMin && totales.length < n) {
+    const t = totalCiclo(gastos, c);
+    if (t > 0) totales.push(t);
+    c = desplazarMes(c, -1);
+  }
+  if (totales.length === 0) return null;
+  return Math.round(totales.reduce((s, t) => s + t, 0) / totales.length);
+}
+
+export function calcularTC(gastos: Expense[], ajustes: PlanAjuste[], mes: string, hoy: string): TCPlan {
+  const ciclo = mes;
+  const estado = estadoCiclo(ciclo, hoy);
+  const real = totalCiclo(gastos, ciclo);
+
+  if (estado === "cerrado") {
+    // La factura ya está. Un ajuste guardado antes del cierre se ignora.
+    return { monto: real, origen: "real", editable: false, ciclo, referencia: real, origenReferencia: "real" };
+  }
+
+  const manual = ajustes.find((a) => a.mes === mes && a.rubro_id === null);
+
+  if (estado === "en_curso") {
+    const inicio = cicloInicio(ciclo);
+    const fin = cicloFin(ciclo);
+    const largo = diasEntre(inicio, fin) + 1;
+    const corridos = diasCorridosEnRango(inicio, fin, hoy);
+    const ritmo = corridos > 0 ? Math.round((real / corridos) * largo) : 0;
+    return manual
+      ? { monto: manual.monto, origen: "manual", editable: true, ciclo, referencia: ritmo, origenReferencia: "ritmo" }
+      : { monto: ritmo, origen: "ritmo", editable: true, ciclo, referencia: ritmo, origenReferencia: "ritmo" };
+  }
+
+  const promedio = promedioCiclosCerrados(gastos, hoy);
+  const referencia = promedio ?? 0;
+  const origenReferencia = promedio === null ? "sin_datos" : "promedio";
+  if (manual) return { monto: manual.monto, origen: "manual", editable: true, ciclo, referencia, origenReferencia };
+  if (promedio === null) return { monto: 0, origen: "sin_datos", editable: true, ciclo, referencia: 0, origenReferencia };
+  return { monto: promedio, origen: "promedio", editable: true, ciclo, referencia, origenReferencia };
 }
