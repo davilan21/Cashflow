@@ -87,6 +87,42 @@ export interface GastoPendiente {
   created_at: string;
 }
 
+export type TipoRubro = "ingreso" | "fijo";
+
+/** Una fuente de ingreso o un gasto fijo recurrente del plan mensual. */
+export interface PlanRubro {
+  id: string;
+  cuenta_id: string;
+  tipo: TipoRubro;
+  nombre: string;
+  monto_default: number;
+  desde: string; // 'YYYY-MM'
+  hasta: string | null; // 'YYYY-MM' o null = sin fin
+  orden: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Lo que el usuario define al crear/editar un rubro. */
+export interface NuevoRubro {
+  tipo: TipoRubro;
+  nombre: string;
+  monto_default: number;
+  desde: string;
+  hasta: string | null;
+}
+
+/** Un monto sobreescrito para un mes. rubro_id null = el estimado de tarjeta. */
+export interface PlanAjuste {
+  id: string;
+  cuenta_id: string;
+  mes: string; // 'YYYY-MM'
+  rubro_id: string | null;
+  monto: number;
+  updated_at: string;
+}
+
 /**
  * Nota: Insert/Update van como literales de objeto inline (no como referencia
  * a un `interface` aparte). Con @supabase/postgrest-js 2.x, cuando Insert/Update
@@ -233,6 +269,48 @@ export interface Database {
           categoria?: string;
           nota?: string;
           fecha?: string;
+        };
+        Relationships: [];
+      };
+      plan_rubros: {
+        Row: PlanRubro;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          tipo: string;
+          nombre: string;
+          monto_default: number;
+          desde: string;
+          hasta?: string | null;
+          orden?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          tipo?: string;
+          nombre?: string;
+          monto_default?: number;
+          desde?: string;
+          hasta?: string | null;
+          orden?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      plan_ajustes: {
+        Row: PlanAjuste;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          mes: string;
+          rubro_id?: string | null;
+          monto: number;
+          updated_at?: string;
+        };
+        Update: {
+          monto?: number;
+          updated_at?: string;
         };
         Relationships: [];
       };
