@@ -5,15 +5,17 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/useToast";
 import { hoyISO } from "@/lib/ciclo";
 import { calcularPlan } from "@/lib/plan/calculo";
-import { guardarAjuste, quitarAjuste } from "@/lib/plan/queries";
+import { guardarAjuste, quitarAjuste, crearRubro, actualizarRubro, eliminarRubro } from "@/lib/plan/queries";
 import { etiquetaMes, etiquetaOrigenTC } from "@/lib/plan/etiquetas";
-import type { Expense, PlanAjuste, PlanRubro } from "@/lib/types";
+import type { Expense, NuevoRubro, PlanAjuste, PlanRubro, TipoRubro } from "@/lib/types";
 import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
 import { SubTabs, type VistaPlan } from "./SubTabs";
 import { ResumenMes } from "./ResumenMes";
 import { ListaMeses } from "./ListaMeses";
 import { AjusteSheet } from "./AjusteSheet";
+import { RubrosPanel } from "./RubrosPanel";
+import { RubroSheet } from "./RubroSheet";
 
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -44,10 +46,52 @@ export function PlanClient({
   const ultimo = plan[plan.length - 1];
   const hayIngresos = rubros.some((r) => r.tipo === "ingreso");
 
-  // setRubros se usa en la vista Rubros (Task 12).
-  void setRubros;
-
   const [editando, setEditando] = useState<{ mes: string; rubroId: string | null } | null>(null);
+  const [hojaRubro, setHojaRubro] = useState<{ rubro: PlanRubro | null; tipo: TipoRubro } | null>(null);
+
+  const guardarRubro = async (datos: NuevoRubro) => {
+    if (!hojaRubro) return;
+    setHojaRubro(null);
+    if (hojaRubro.rubro) {
+      const id = hojaRubro.rubro.id;
+      const previo = hojaRubro.rubro;
+      setRubros((prev) => prev.map((r) => (r.id === id ? { ...r, ...datos } : r)));
+      const { data, error } = await actualizarRubro(supabase, id, datos);
+      if (error || !data) {
+        setRubros((prev) => prev.map((r) => (r.id === id ? previo : r)));
+        mostrar("No se pudo guardar el rubro");
+        return;
+      }
+      setRubros((prev) => prev.map((r) => (r.id === id ? data : r)));
+      return;
+    }
+    const idTmp = `tmp-${Date.now()}`;
+    const provisional: PlanRubro = { id: idTmp, cuenta_id: cuentaId, orden: 0, created_by: null, created_at: new Date().toISOString(), updated_at: "", ...datos };
+    setRubros((prev) => [...prev, provisional]);
+    const { data, error } = await crearRubro(supabase, cuentaId, datos);
+    if (error || !data) {
+      setRubros((prev) => prev.filter((r) => r.id !== idTmp));
+      mostrar("No se pudo crear el rubro");
+      return;
+    }
+    setRubros((prev) => prev.map((r) => (r.id === idTmp ? data : r)));
+  };
+
+  const borrarRubro = async () => {
+    if (!hojaRubro?.rubro) return;
+    const id = hojaRubro.rubro.id;
+    const rubroBorrado = hojaRubro.rubro;
+    const ajustesBorrados = ajustes.filter((a) => a.rubro_id === id);
+    setHojaRubro(null);
+    setRubros((prev) => prev.filter((r) => r.id !== id));
+    setAjustes((prev) => prev.filter((a) => a.rubro_id !== id)); // la base cascadea; el estado también
+    const { error } = await eliminarRubro(supabase, id);
+    if (error) {
+      setRubros((prev) => (prev.some((r) => r.id === id) ? prev : [...prev, rubroBorrado]));
+      setAjustes((prev) => [...prev, ...ajustesBorrados.filter((b) => !prev.some((a) => a.id === b.id))]);
+      mostrar("No se pudo eliminar el rubro");
+    }
+  };
 
   const mismoAjuste = (a: PlanAjuste, mes: string, rubroId: string | null) => a.mes === mes && a.rubro_id === rubroId;
 
@@ -159,7 +203,16 @@ export function PlanClient({
       {vista === "meses" && (
         <>
           {!lecturaFallida && !hayIngresos && (
-            <Banner tono="info" accion={{ etiqueta: "Agregar", onClick: () => setVista("rubros") }}>
+            <Banner
+              tono="info"
+              accion={{
+                etiqueta: "Agregar",
+                onClick: () => {
+                  setVista("rubros");
+                  setHojaRubro({ rubro: null, tipo: "ingreso" });
+                },
+              }}
+            >
               Agregá tus ingresos y gastos fijos para ver el ahorro.
             </Banner>
           )}
@@ -168,7 +221,13 @@ export function PlanClient({
         </>
       )}
 
-      {vista === "rubros" && <div className="text-[13px] text-muted">Próximamente.</div>}
+      {vista === "rubros" && (
+        <RubrosPanel
+          rubros={rubros}
+          onNuevo={(tipo) => setHojaRubro({ rubro: null, tipo })}
+          onEditar={(rubro) => setHojaRubro({ rubro, tipo: rubro.tipo })}
+        />
+      )}
 
       {editando && hoja && (
         <AjusteSheet
@@ -176,6 +235,18 @@ export function PlanClient({
           onGuardar={(monto) => guardar(editando.mes, editando.rubroId, monto)}
           onQuitar={() => quitar(editando.mes, editando.rubroId)}
           onCerrar={() => setEditando(null)}
+        />
+      )}
+
+      {hojaRubro && (
+        <RubroSheet
+          inicial={hojaRubro.rubro}
+          tipoInicial={hojaRubro.tipo}
+          mesActual={hoy.slice(0, 7)}
+          ajustesDelRubro={hojaRubro.rubro ? ajustes.filter((a) => a.rubro_id === hojaRubro.rubro!.id).length : 0}
+          onGuardar={guardarRubro}
+          onEliminar={borrarRubro}
+          onCerrar={() => setHojaRubro(null)}
         />
       )}
 
