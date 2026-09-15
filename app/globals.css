@@ -20,6 +20,14 @@
   }
 }
 
+@keyframes sheet-subir {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet-entrar {
+  animation: sheet-subir 220ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
