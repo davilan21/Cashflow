@@ -61,6 +61,25 @@ function infoCdt(inst: AhorroInstrumento, hoy: string): InfoCdt | null {
   return { diasAlVencimiento: dias, estado };
 }
 
+/**
+ * Valor a `corte`: si hay una valoración <= corte, se le suman los
+ * movimientos netos ocurridos DESPUÉS de esa valoración y hasta `corte`
+ * (puede ser negativo si hubo un retiro neto); si no hay valoración,
+ * el valor es simplemente lo aportado.
+ */
+function valorA(
+  movimientos: AhorroMovimiento[],
+  valoraciones: AhorroValoracion[],
+  instrumentoId: string,
+  corte: string
+): { valor: number; origen: AhorroValoracion | null } {
+  const ultima = valoracionHasta(valoraciones, instrumentoId, corte);
+  if (!ultima) return { valor: aportadoHasta(movimientos, instrumentoId, corte), origen: null };
+  const movimientosPosteriores =
+    aportadoHasta(movimientos, instrumentoId, corte) - aportadoHasta(movimientos, instrumentoId, ultima.fecha);
+  return { valor: ultima.valor + movimientosPosteriores, origen: ultima };
+}
+
 export function resumenInstrumento(
   inst: AhorroInstrumento,
   movimientos: AhorroMovimiento[],
@@ -69,9 +88,8 @@ export function resumenInstrumento(
   hoy: string
 ): ResumenInstrumento {
   const aportado = aportadoHasta(movimientos, inst.id, hoy);
-  const ultima = valoracionHasta(valoraciones, inst.id, hoy);
-  const valor = ultima ? ultima.valor : aportado;
-  const origenValor: OrigenValor = ultima ? { tipo: "valoracion", fecha: ultima.fecha } : { tipo: "aportado" };
+  const { valor, origen } = valorA(movimientos, valoraciones, inst.id, hoy);
+  const origenValor: OrigenValor = origen ? { tipo: "valoracion", fecha: origen.fecha } : { tipo: "aportado" };
   const rendimiento = valor - aportado;
   const aportadoCOP = aCOP(aportado, inst.moneda, trm);
   const valorCOP = aCOP(valor, inst.moneda, trm);
@@ -209,13 +227,7 @@ export function serieMensual(opts: {
     let usoAproximada = false;
     for (const inst of instrumentos) {
       const aportado = aportadoHasta(movimientos, inst.id, corte);
-      const ultima = valoracionHasta(valoraciones, inst.id, corte);
-      let valor = aportado;
-      if (ultima) {
-        // Valoracion covers aportes until valorization date; add aportes after that.
-        const aportadoUntilValorizacion = aportadoHasta(movimientos, inst.id, ultima.fecha);
-        valor = ultima.valor + Math.max(0, aportado - aportadoUntilValorizacion);
-      }
+      const { valor } = valorA(movimientos, valoraciones, inst.id, corte);
       const a = aCOP(aportado, inst.moneda, trm);
       const v = aCOP(valor, inst.moneda, trm);
       if (a === null || v === null) continue; // USD sin ninguna TRM: fuera, como en el portafolio

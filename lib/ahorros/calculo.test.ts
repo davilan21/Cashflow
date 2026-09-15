@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { trmVigente, aCOP, resumenInstrumento } from "./calculo";
+import { trmVigente, aCOP, resumenInstrumento, resumenPortafolio, serieMensual, aporteVsMeta } from "./calculo";
 import type { AhorroInstrumento, AhorroMovimiento, AhorroValoracion, Trm } from "@/lib/types";
+import type { MesPlan } from "@/lib/plan/calculo";
 
 export function inst(p: Partial<AhorroInstrumento> & Pick<AhorroInstrumento, "id">): AhorroInstrumento {
   return {
@@ -97,9 +98,19 @@ describe("resumenInstrumento", () => {
     expect(r.aportado).toBe(1);
     expect(r.valor).toBe(1);
   });
-});
 
-import { resumenPortafolio } from "./calculo";
+  it("un retiro después de la última valoración resta del valor, no solo suma aportes", () => {
+    const r = resumenInstrumento(
+      cdt,
+      [mov("cdt1", "2026-08-01", "aporte", 1_000_000), mov("cdt1", "2026-09-05", "retiro", 300_000)],
+      [val("cdt1", "2026-09-01", 1_100_000)],
+      null,
+      HOY
+    );
+    expect(r.valor).toBe(800_000); // 1.1M valorado + (aportado neto después: -300k)
+    expect(r.origenValor).toEqual({ tipo: "valoracion", fecha: "2026-09-01" });
+  });
+});
 
 describe("resumenPortafolio", () => {
   const instrumentos = [
@@ -169,9 +180,6 @@ describe("resumenPortafolio", () => {
     expect(r.porTitular).toEqual([]);
   });
 });
-
-import { serieMensual, aporteVsMeta } from "./calculo";
-import type { MesPlan } from "@/lib/plan/calculo";
 
 function mesPlan(mes: string, ahorro: number | null): MesPlan {
   return {
