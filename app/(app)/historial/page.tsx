@@ -25,17 +25,19 @@ export default async function HistorialPage() {
   const esCompartida = (miembrosRes.data ?? []).length >= 2;
 
   return (
-    <HistorialClient
-      cuentaId={cuentaId ?? ""}
-      gastosIniciales={lecturaFallida ? [] : gastosRes.data ?? []}
-      categorias={lecturaFallida ? [] : categoriasRes.data ?? []}
-      settingsIniciales={
-        lecturaFallida || !settingsRes.data
-          ? { cuenta_id: cuentaId ?? "", tope_ciclo: 4_000_000, tope_quincena: 2_000_000, dia_corte: 15, dia_pago: 30, updated_at: "" }
-          : settingsRes.data
-      }
-      esCompartida={esCompartida}
-      lecturaFallida={lecturaFallida}
-    />
+    <div className="max-w-xl mx-auto">
+      <HistorialClient
+        cuentaId={cuentaId ?? ""}
+        gastosIniciales={lecturaFallida ? [] : gastosRes.data ?? []}
+        categorias={lecturaFallida ? [] : categoriasRes.data ?? []}
+        settingsIniciales={
+          lecturaFallida || !settingsRes.data
+            ? { cuenta_id: cuentaId ?? "", tope_ciclo: 4_000_000, tope_quincena: 2_000_000, dia_corte: 15, dia_pago: 30, updated_at: "" }
+            : settingsRes.data
+        }
+        esCompartida={esCompartida}
+        lecturaFallida={lecturaFallida}
+      />
+    </div>
   );
 }

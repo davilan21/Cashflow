@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-xl mx-auto px-4 pt-4 pb-24">
+      <div className="max-w-xl lg:max-w-4xl mx-auto px-4 pt-4 pb-24">
         <NavTabs pendientesCount={pendientesCount} />
         {children}
       </div>

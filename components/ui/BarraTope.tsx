@@ -1,13 +1,25 @@
 const colorPor = (pct: number) => (pct >= 100 ? "#C4544F" : pct >= 80 ? "#C08A2E" : "#4E8C5A");
 
 /** Barra de progreso a rayas, en 10 segmentos, usada para los topes de ciclo y quincena. */
-export function BarraTope({ pct, alto = "h-[26px]" }: { pct: number; alto?: string }) {
-  const color = colorPor(pct);
+export function BarraTope({
+  pct,
+  alto = "h-[26px]",
+  color,
+  etiqueta,
+}: {
+  pct: number;
+  alto?: string;
+  /** Si se da, reemplaza el color calculado por colorPor(pct) — para casos donde 100% es bueno, no malo. */
+  color?: string;
+  /** Si se da, reemplaza el aria-label por defecto ("N por ciento del tope"). */
+  etiqueta?: string;
+}) {
+  const colorFinal = color ?? colorPor(pct);
   return (
     <div
       className={`flex gap-0.5 ${alto} rounded-md overflow-hidden bg-[#E4DFEC]`}
       role="img"
-      aria-label={`${Math.round(pct)} por ciento del tope`}
+      aria-label={etiqueta ?? `${Math.round(pct)} por ciento del tope`}
     >
       {Array.from({ length: 10 }).map((_, i) => {
         const llenado = Math.max(0, Math.min(1, (pct - i * 10) / 10));
@@ -18,7 +30,7 @@ export function BarraTope({ pct, alto = "h-[26px]" }: { pct: number; alto?: stri
                 className="absolute inset-0"
                 style={{
                   right: `${(1 - llenado) * 100}%`,
-                  backgroundColor: color,
+                  backgroundColor: colorFinal,
                   backgroundImage:
                     "repeating-linear-gradient(115deg, rgba(255,255,255,0.22) 0 2px, transparent 2px 6px)",
                 }}

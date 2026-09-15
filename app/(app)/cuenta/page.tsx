@@ -21,12 +21,14 @@ export default async function CuentaPage() {
   const lecturaFallida = Boolean(miembrosRes.error || cuentaRes.error);
 
   return (
-    <CuentaClient
-      userId={user.id}
-      miembros={lecturaFallida ? [] : miembrosRes.data ?? []}
-      cuenta={lecturaFallida ? null : cuentaRes.data}
-      lecturaFallida={lecturaFallida}
-      estadoConexionGmail={estadoConexionGmail}
-    />
+    <div className="max-w-xl mx-auto">
+      <CuentaClient
+        userId={user.id}
+        miembros={lecturaFallida ? [] : miembrosRes.data ?? []}
+        cuenta={lecturaFallida ? null : cuentaRes.data}
+        lecturaFallida={lecturaFallida}
+        estadoConexionGmail={estadoConexionGmail}
+      />
+    </div>
   );
 }

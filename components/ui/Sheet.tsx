@@ -16,10 +16,12 @@ export function Sheet({
   titulo,
   onClose,
   children,
+  ancho = "md",
 }: {
   titulo: string;
   onClose: () => void;
   children: React.ReactNode;
+  ancho?: "md" | "lg";
 }) {
   const tituloId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -73,7 +75,7 @@ export function Sheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink/45 flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-ink/45 flex items-end lg:items-center justify-center lg:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -84,9 +86,9 @@ export function Sheet({
         aria-modal="true"
         aria-labelledby={tituloId}
         tabIndex={-1}
-        className="sheet-entrar w-full max-w-xl bg-surface rounded-t-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[90vh] overflow-y-auto"
+        className={`sheet-entrar lg:animate-none w-full ${ancho === "lg" ? "lg:max-w-2xl" : "lg:max-w-md"} max-w-xl bg-surface rounded-t-2xl lg:rounded-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:pb-5 max-h-[90vh] overflow-y-auto`}
       >
-        <div className="mx-auto w-10 h-1 rounded-full bg-line mb-3" aria-hidden="true" />
+        <div className="mx-auto w-10 h-1 rounded-full bg-line mb-3 lg:hidden" aria-hidden="true" />
         <div className="flex items-start justify-between gap-2">
           <h3 id={tituloId} className="flex-1 text-[17px] font-semibold text-ink">
             {titulo}

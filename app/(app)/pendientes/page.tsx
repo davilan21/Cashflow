@@ -21,11 +21,13 @@ export default async function PendientesPage() {
   const lecturaFallida = Boolean(pendientesRes.error || categoriasRes.error);
 
   return (
-    <PendientesClient
-      pendientesIniciales={lecturaFallida ? [] : pendientesRes.data ?? []}
-      categorias={lecturaFallida ? [] : categoriasRes.data ?? []}
-      estadoConexion={estadoConexion}
-      lecturaFallida={lecturaFallida}
-    />
+    <div className="max-w-xl mx-auto">
+      <PendientesClient
+        pendientesIniciales={lecturaFallida ? [] : pendientesRes.data ?? []}
+        categorias={lecturaFallida ? [] : categoriasRes.data ?? []}
+        estadoConexion={estadoConexion}
+        lecturaFallida={lecturaFallida}
+      />
+    </div>
   );
 }

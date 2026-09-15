@@ -22,12 +22,14 @@ export default async function PlanPage() {
   const lecturaFallida = Boolean(cuentaRes.error || !cuentaId || rubrosRes.error || ajustesRes.error || gastosRes.error);
 
   return (
-    <PlanClient
-      cuentaId={cuentaId ?? ""}
-      rubrosIniciales={lecturaFallida ? [] : rubrosRes.data ?? []}
-      ajustesIniciales={lecturaFallida ? [] : ajustesRes.data ?? []}
-      gastos={lecturaFallida ? [] : gastosRes.data ?? []}
-      lecturaFallida={lecturaFallida}
-    />
+    <div className="max-w-xl mx-auto">
+      <PlanClient
+        cuentaId={cuentaId ?? ""}
+        rubrosIniciales={lecturaFallida ? [] : rubrosRes.data ?? []}
+        ajustesIniciales={lecturaFallida ? [] : ajustesRes.data ?? []}
+        gastos={lecturaFallida ? [] : gastosRes.data ?? []}
+        lecturaFallida={lecturaFallida}
+      />
+    </div>
   );
 }

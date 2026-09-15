@@ -50,9 +50,11 @@ Supabase y ejecuta, en orden, el contenido de:
 3. `supabase/migrations/0003_cuentas_compartidas.sql`
 4. `supabase/migrations/0004_gmail_integracion.sql`
 5. `supabase/migrations/0011_plan_mensual.sql`
+6. `supabase/migrations/0012_ahorros.sql`
 
 Los números 0005–0010 están reservados por la rama de Flujo de caja (sin
-mergear); 0011 se eligió para no colisionar.
+mergear); 0011 y 0012 se eligieron para no colisionar. `/ahorros` no carga
+sin `0012_ahorros.sql`.
 
 Verifica que quedaron 9 filas en `categories` y que RLS está habilitado en
 todas las tablas (**Database → Tables**, columna *RLS enabled*).
@@ -170,3 +172,6 @@ previsualización de cantidad y total antes de confirmar).
 - **Zona horaria**: "hoy" siempre se calcula en `America/Bogota`
   (`lib/ciclo.ts#hoyISO`), sin importar dónde corra el servidor o el
   navegador del usuario.
+- **TRM en `/ahorros`**: la actualización automática llama a la API pública
+  de datos abiertos de `datos.gov.co` (dataset del Banco de la República, sin
+  llave). Si no responde, la pantalla cae a carga manual de la TRM.
