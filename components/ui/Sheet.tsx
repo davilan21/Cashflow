@@ -23,7 +23,13 @@ export function Sheet({
 }) {
   const tituloId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // Gestión de foco: debe correr una sola vez por montaje (mover foco adentro,
+  // atrapar Tab, restaurar al desmontar). onClose se lee vía onCloseRef para no
+  // re-disparar el ciclo mount/unmount cuando el padre pasa un callback no
+  // memoizado; por eso el array de deps queda vacío a propósito.
   useEffect(() => {
     const panel = panelRef.current;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -36,7 +42,7 @@ export function Sheet({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === "Tab" && panel) {
@@ -63,7 +69,7 @@ export function Sheet({
         previouslyFocused.focus();
       }
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div
