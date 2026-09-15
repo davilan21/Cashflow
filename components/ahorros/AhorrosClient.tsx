@@ -1,12 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/useToast";
 import { hoyISO } from "@/lib/ciclo";
 import { resumenPortafolio, aporteVsMeta, serieMensual } from "@/lib/ahorros/calculo";
-import { crearInstrumento, actualizarInstrumento, eliminarInstrumento } from "@/lib/ahorros/queries";
-import type { AhorroInstrumento, AhorroMovimiento, AhorroValoracion, Miembro, NuevoInstrumento, Trm } from "@/lib/types";
+import {
+  crearInstrumento,
+  actualizarInstrumento,
+  eliminarInstrumento,
+  crearMovimiento,
+  eliminarMovimiento,
+  guardarValoracion,
+  eliminarValoracion,
+} from "@/lib/ahorros/queries";
+import type {
+  AhorroInstrumento,
+  AhorroMovimiento,
+  AhorroValoracion,
+  Miembro,
+  NuevoInstrumento,
+  NuevoMovimiento,
+  TipoMovimiento,
+  Trm,
+} from "@/lib/types";
 import type { MesPlan } from "@/lib/plan/calculo";
 import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
@@ -17,6 +34,10 @@ import { GraficaEvolucion } from "./GraficaEvolucion";
 import { ListaInstrumentos } from "./ListaInstrumentos";
 import { DetalleInstrumentoSheet } from "./DetalleInstrumentoSheet";
 import { InstrumentoSheet } from "./InstrumentoSheet";
+import { MovimientoSheet } from "./MovimientoSheet";
+import { ValoracionSheet } from "./ValoracionSheet";
+
+const claveValoracion = (instrumentoId: string, fecha: string) => `${instrumentoId}|${fecha}`;
 
 export function AhorrosClient({
   cuentaId,
@@ -118,6 +139,86 @@ export function AhorrosClient({
     }
   };
 
+  const colaRef = useRef(new Map<string, Promise<void>>());
+  const generacionRef = useRef(new Map<string, number>());
+  const encolar = (clave: string, tarea: () => Promise<void>): Promise<void> => {
+    const previa = colaRef.current.get(clave) ?? Promise.resolve();
+    const siguiente = previa.then(tarea, tarea);
+    colaRef.current.set(clave, siguiente);
+    return siguiente;
+  };
+
+  const [hojaMovimiento, setHojaMovimiento] = useState<{ instrumento: AhorroInstrumento; tipo: TipoMovimiento } | null>(null);
+
+  const guardarMovimiento = async (datos: NuevoMovimiento) => {
+    const idTmp = `tmp-${Date.now()}`;
+    const provisional: AhorroMovimiento = { id: idTmp, cuenta_id: cuentaId, created_by: userId, created_at: new Date().toISOString(), ...datos };
+    setMovimientos((prev) => [provisional, ...prev]);
+    setHojaMovimiento(null);
+    const { data, error } = await crearMovimiento(supabase, cuentaId, datos);
+    if (error || !data) {
+      setMovimientos((prev) => prev.filter((m) => m.id !== idTmp));
+      mostrar("No se pudo guardar el movimiento");
+      return;
+    }
+    setMovimientos((prev) => prev.map((m) => (m.id === idTmp ? data : m)));
+  };
+
+  const borrarMovimiento = async (id: string) => {
+    const anterior = movimientos.find((m) => m.id === id) ?? null;
+    setMovimientos((prev) => prev.filter((m) => m.id !== id));
+    const { error } = await eliminarMovimiento(supabase, id);
+    if (error) {
+      if (anterior) setMovimientos((prev) => (prev.some((m) => m.id === id) ? prev : [...prev, anterior]));
+      mostrar("No se pudo eliminar el movimiento");
+    }
+  };
+
+  const [hojaValoracion, setHojaValoracion] = useState<AhorroInstrumento | null>(null);
+
+  const guardarValoracionUI = (instrumentoId: string, valor: number, fecha: string) => {
+    const clave = claveValoracion(instrumentoId, fecha);
+    const miGen = (generacionRef.current.get(clave) ?? 0) + 1;
+    generacionRef.current.set(clave, miGen);
+    const existente = valoraciones.find((v) => v.instrumento_id === instrumentoId && v.fecha === fecha);
+    const provisional: AhorroValoracion = existente
+      ? { ...existente, valor }
+      : { id: `tmp-${clave}`, cuenta_id: cuentaId, instrumento_id: instrumentoId, fecha, valor, nota: null, created_by: userId, created_at: "" };
+    setValoraciones((prev) => [...prev.filter((v) => !(v.instrumento_id === instrumentoId && v.fecha === fecha)), provisional]);
+    setHojaValoracion(null);
+
+    const esUltima = () => generacionRef.current.get(clave) === miGen;
+    void encolar(clave, async () => {
+      const { data, error } = await guardarValoracion(supabase, cuentaId, instrumentoId, fecha, valor, null);
+      if (error || !data) {
+        if (esUltima()) {
+          setValoraciones((prev) =>
+            existente
+              ? prev.map((v) => (v.instrumento_id === instrumentoId && v.fecha === fecha ? existente : v))
+              : prev.filter((v) => !(v.instrumento_id === instrumentoId && v.fecha === fecha))
+          );
+        }
+        mostrar("No se pudo guardar la valoración");
+        return;
+      }
+      setValoraciones((prev) => {
+        const hay = prev.some((v) => v.instrumento_id === instrumentoId && v.fecha === fecha);
+        if (esUltima()) return hay ? prev.map((v) => (v.instrumento_id === instrumentoId && v.fecha === fecha ? data : v)) : [...prev, data];
+        return prev.map((v) => (v.instrumento_id === instrumentoId && v.fecha === fecha ? { ...v, id: data.id } : v));
+      });
+    }).catch(() => mostrar("Falló una operación de valoración; recargá la página"));
+  };
+
+  const borrarValoracion = async (id: string) => {
+    const anterior = valoraciones.find((v) => v.id === id) ?? null;
+    setValoraciones((prev) => prev.filter((v) => v.id !== id));
+    const { error } = await eliminarValoracion(supabase, id);
+    if (error) {
+      if (anterior) setValoraciones((prev) => (prev.some((v) => v.id === id) ? prev : [...prev, anterior]));
+      mostrar("No se pudo eliminar la valoración");
+    }
+  };
+
   // setTrms se usa en la Task 16.
   void setTrms;
 
@@ -159,12 +260,12 @@ export function AhorrosClient({
           valoraciones={valoraciones.filter((v) => v.instrumento_id === detalle.instrumento.id)}
           miembros={miembros}
           onCerrar={() => setSeleccionado(null)}
-          onAportar={() => {}}
-          onRetirar={() => {}}
-          onActualizarValor={() => {}}
+          onAportar={() => setHojaMovimiento({ instrumento: detalle.instrumento, tipo: "aporte" })}
+          onRetirar={() => setHojaMovimiento({ instrumento: detalle.instrumento, tipo: "retiro" })}
+          onActualizarValor={() => setHojaValoracion(detalle.instrumento)}
           onEditar={() => setHojaInstrumento({ instrumento: detalle.instrumento })}
-          onEliminarMovimiento={() => {}}
-          onEliminarValoracion={() => {}}
+          onEliminarMovimiento={borrarMovimiento}
+          onEliminarValoracion={borrarValoracion}
           onEliminarInstrumento={borrarInstrumento}
         />
       )}
@@ -175,6 +276,23 @@ export function AhorrosClient({
           miembros={miembros}
           onGuardar={guardarInstrumento}
           onCerrar={() => setHojaInstrumento(null)}
+        />
+      )}
+
+      {hojaMovimiento && (
+        <MovimientoSheet
+          instrumento={hojaMovimiento.instrumento}
+          tipo={hojaMovimiento.tipo}
+          onGuardar={guardarMovimiento}
+          onCerrar={() => setHojaMovimiento(null)}
+        />
+      )}
+      {hojaValoracion && (
+        <ValoracionSheet
+          instrumento={hojaValoracion}
+          aportado={resumen.instrumentos.find((r) => r.instrumento.id === hojaValoracion.id)?.aportado ?? 0}
+          onGuardar={(valor, fecha) => guardarValoracionUI(hojaValoracion.id, valor, fecha)}
+          onCerrar={() => setHojaValoracion(null)}
         />
       )}
 
