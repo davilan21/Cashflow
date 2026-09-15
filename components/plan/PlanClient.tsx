@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/useToast";
 import { hoyISO } from "@/lib/ciclo";
@@ -51,33 +51,63 @@ export function PlanClient({
 
   const mismoAjuste = (a: PlanAjuste, mes: string, rubroId: string | null) => a.mes === mes && a.rubro_id === rubroId;
 
-  const guardar = async (mes: string, rubroId: string | null, monto: number) => {
-    const anterior = ajustes;
-    const existente = ajustes.find((a) => mismoAjuste(a, mes, rubroId));
-    const provisional: PlanAjuste = existente
-      ? { ...existente, monto }
-      : { id: `tmp-${mes}-${rubroId ?? "tc"}`, cuenta_id: cuentaId, mes, rubro_id: rubroId, monto, updated_at: "" };
-    // Optimista: se ve el cambio ya; si falla, vuelve lo anterior.
-    setAjustes((prev) => [...prev.filter((a) => !mismoAjuste(a, mes, rubroId)), provisional]);
-    setEditando(null);
-    const { data, error } = await guardarAjuste(supabase, cuentaId, mes, rubroId, monto);
-    if (error || !data) {
-      setAjustes(anterior);
-      mostrar("No se pudo guardar el ajuste");
-      return;
-    }
-    setAjustes((prev) => prev.map((a) => (a.id === provisional.id ? data : a)));
+  const claveDe = (mes: string, rubroId: string | null) => `${mes}|${rubroId ?? "tc"}`;
+
+  // Dos guardados/quitados seguidos sobre la misma clave (mes+rubro) llegaban
+  // desordenados: la respuesta del primero podía resolver después que la del
+  // segundo y pisar el estado más nuevo con el viejo. Encolamos por clave para
+  // que cada mutación de una fila espere a que termine la anterior sobre esa
+  // misma fila (aunque haya fallado), sin bloquear otras filas.
+  const colaRef = useRef(new Map<string, Promise<void>>());
+  const encolar = (clave: string, tarea: () => Promise<void>): Promise<void> => {
+    const previa = colaRef.current.get(clave) ?? Promise.resolve();
+    const siguiente = previa.then(tarea, tarea); // corre aunque la anterior haya fallado
+    colaRef.current.set(clave, siguiente);
+    return siguiente;
   };
 
-  const quitar = async (mes: string, rubroId: string | null) => {
-    const anterior = ajustes;
+  const guardar = (mes: string, rubroId: string | null, monto: number) => {
+    const filaPrevia = ajustes.find((a) => mismoAjuste(a, mes, rubroId));
+    const provisional: PlanAjuste = filaPrevia
+      ? { ...filaPrevia, monto }
+      : { id: `tmp-${mes}-${rubroId ?? "tc"}`, cuenta_id: cuentaId, mes, rubro_id: rubroId, monto, updated_at: "" };
+    // Optimista: se ve el cambio ya; si falla, vuelve solo esta fila.
+    setAjustes((prev) => [...prev.filter((a) => !mismoAjuste(a, mes, rubroId)), provisional]);
+    setEditando(null);
+    void encolar(claveDe(mes, rubroId), async () => {
+      const { data, error } = await guardarAjuste(supabase, cuentaId, mes, rubroId, monto);
+      if (error || !data) {
+        setAjustes((prev) => {
+          const actual = prev.find((a) => mismoAjuste(a, mes, rubroId));
+          if (!actual || actual.monto !== monto) return prev; // una llamada más nueva ya cambió la fila
+          return filaPrevia
+            ? prev.map((a) => (mismoAjuste(a, mes, rubroId) ? filaPrevia : a))
+            : prev.filter((a) => !mismoAjuste(a, mes, rubroId));
+        });
+        mostrar("No se pudo guardar el ajuste");
+        return;
+      }
+      setAjustes((prev) =>
+        prev.map((a) => (mismoAjuste(a, mes, rubroId) ? { ...a, id: data.id, updated_at: data.updated_at } : a)),
+      );
+    });
+  };
+
+  const quitar = (mes: string, rubroId: string | null) => {
+    const filaPrevia = ajustes.find((a) => mismoAjuste(a, mes, rubroId));
     setAjustes((prev) => prev.filter((a) => !mismoAjuste(a, mes, rubroId)));
     setEditando(null);
-    const { error } = await quitarAjuste(supabase, cuentaId, mes, rubroId);
-    if (error) {
-      setAjustes(anterior);
-      mostrar("No se pudo quitar el ajuste");
-    }
+    void encolar(claveDe(mes, rubroId), async () => {
+      const { error } = await quitarAjuste(supabase, cuentaId, mes, rubroId);
+      if (error) {
+        setAjustes((prev) => {
+          const yaExiste = prev.some((a) => mismoAjuste(a, mes, rubroId));
+          if (yaExiste || !filaPrevia) return prev; // un guardado más nuevo ya recreó la fila
+          return [...prev, filaPrevia];
+        });
+        mostrar("No se pudo quitar el ajuste");
+      }
+    });
   };
 
   // Datos que la hoja necesita para el ajuste abierto.
