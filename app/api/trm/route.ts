@@ -31,8 +31,11 @@ export async function GET() {
   if (!r.data) return NextResponse.json({ error: r.error ?? "TRM no disponible" }, { status: 502 });
 
   if (r.llamoAfuera) {
-    const guardada = await guardarTrm(supabase, cuenta.data, r.data.fecha, r.data.valor, "datos.gov.co");
+    const guardada = await guardarTrm(supabase, cuenta.data, hoy, r.data.valor, "datos.gov.co");
     if (guardada.error) return NextResponse.json({ error: `TRM obtenida pero no se pudo guardar: ${guardada.error.message}` }, { status: 500 });
   }
-  return NextResponse.json(r.data);
+  // La fecha que reporta la app es siempre "hoy" (la fila que esta ruta lee y
+  // escribe), nunca la vigenciadesde cruda de datos.gov.co — evita que el
+  // cliente persista una copia optimista bajo una fecha distinta.
+  return NextResponse.json({ ...r.data, fecha: hoy });
 }
