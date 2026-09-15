@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/useToast";
 import { hoyISO } from "@/lib/ciclo";
-import { resumenPortafolio, aporteVsMeta } from "@/lib/ahorros/calculo";
+import { resumenPortafolio, aporteVsMeta, serieMensual } from "@/lib/ahorros/calculo";
 import type { AhorroInstrumento, AhorroMovimiento, AhorroValoracion, Miembro, Trm } from "@/lib/types";
 import type { MesPlan } from "@/lib/plan/calculo";
 import { Banner } from "@/components/ui/Banner";
@@ -12,6 +12,7 @@ import { Toast } from "@/components/ui/Toast";
 import { FiltroTitular, type ValorFiltro } from "./FiltroTitular";
 import { ResumenPortafolio } from "./ResumenPortafolio";
 import { AporteVsMeta } from "./AporteVsMeta";
+import { GraficaEvolucion } from "./GraficaEvolucion";
 
 export function AhorrosClient({
   cuentaId,
@@ -52,6 +53,10 @@ export function AhorrosClient({
     () => aporteVsMeta({ instrumentos, movimientos, trms, hoy, plan }),
     [instrumentos, movimientos, trms, hoy, plan]
   );
+  const serie = useMemo(
+    () => serieMensual({ instrumentos, movimientos, valoraciones, trms, hoy, plan }),
+    [instrumentos, movimientos, valoraciones, trms, hoy, plan]
+  );
   const hayInstrumentos = instrumentos.length > 0;
 
   // cuentaId, userId, supabase, setInstrumentos, setMovimientos, setValoraciones,
@@ -72,6 +77,7 @@ export function AhorrosClient({
           <FiltroTitular miembros={miembros} valor={filtroTitular} onCambiar={setFiltroTitular} />
           <ResumenPortafolio resumen={resumen} onEditarTrm={() => {}} />
           <AporteVsMeta datos={vsMeta} />
+          <GraficaEvolucion puntos={serie} />
         </>
       )}
 
