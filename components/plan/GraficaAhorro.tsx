@@ -21,8 +21,9 @@ function TooltipAhorro({ active, payload }: { active?: boolean; payload?: { payl
 
 export function GraficaAhorro({ plan, onSeleccionar }: { plan: MesPlan[]; onSeleccionar: (mes: string) => void }) {
   const datos = plan.map((m) => ({ ...m, valor: m.ahorro ?? 0 }));
+  // Chart is decorative; the month list below has the accessible equivalent (aria-expanded buttons).
   return (
-    <div className="bg-surface border border-line rounded-2xl px-1 pt-4 pb-2.5 mb-3.5" style={{ height: 170 }}>
+    <div className="bg-surface border border-line rounded-2xl px-1 pt-4 pb-2.5 mb-3.5 min-h-[178px]" aria-hidden="true">
       <ResponsiveContainer width="100%" height={150}>
         <BarChart data={datos} margin={{ top: 18, right: 12, left: 12, bottom: 0 }} barCategoryGap="22%">
           <XAxis dataKey="mes" tickFormatter={etiquetaMesCorta} tick={{ fontSize: 10, fill: "#6E6879" }} axisLine={false} tickLine={false} />
