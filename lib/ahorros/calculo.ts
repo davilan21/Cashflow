@@ -1,6 +1,7 @@
-import { diasEntre } from "@/lib/ciclo";
+import { diasEntre, desplazarMes, diasEnMes, mesDe } from "@/lib/ciclo";
 import type { AhorroInstrumento, AhorroMovimiento, AhorroValoracion, Moneda, Trm } from "@/lib/types";
 import type { EstadoCdt, OrigenValor } from "./etiquetas";
+import type { MesPlan } from "@/lib/plan/calculo";
 
 export interface InfoCdt {
   diasAlVencimiento: number;
@@ -163,5 +164,109 @@ export function resumenPortafolio(opts: {
     trm,
     porTitular: participaciones(instrumentos, (r) => r.instrumento.titular ?? "hogar"),
     porTipo: participaciones(instrumentos, (r) => r.instrumento.tipo),
+  };
+}
+
+export interface PuntoSerie {
+  mes: string;
+  aportadoCOP: number;
+  valorCOP: number;
+  /** true si algún USD se convirtió con una TRM anterior a la primera conocida. */
+  trmAproximada: boolean;
+  metaPlan: number | null;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const finDeMes = (mes: string) => `${mes}-${pad2(diasEnMes(mes))}`;
+
+/** TRM para un mes: la vigente al fin de mes; si no hay, la primera conocida (aproximada). */
+function trmDeMes(trms: Trm[], mes: string): { trm: Trm | null; aproximada: boolean } {
+  const vigente = trmVigente(trms, finDeMes(mes));
+  if (vigente) return { trm: vigente, aproximada: false };
+  const primera = [...trms].sort((a, b) => a.fecha.localeCompare(b.fecha))[0] ?? null;
+  return { trm: primera, aproximada: primera !== null };
+}
+
+export function serieMensual(opts: {
+  instrumentos: AhorroInstrumento[];
+  movimientos: AhorroMovimiento[];
+  valoraciones: AhorroValoracion[];
+  trms: Trm[];
+  hoy: string;
+  plan: MesPlan[];
+}): PuntoSerie[] {
+  const { instrumentos, movimientos, valoraciones, trms, hoy, plan } = opts;
+  if (movimientos.length === 0) return [];
+  const primerMes = mesDe(movimientos.map((m) => m.fecha).sort()[0]);
+  const mesHoy = mesDe(hoy);
+  const salida: PuntoSerie[] = [];
+
+  for (let mes = primerMes; mes <= mesHoy; mes = desplazarMes(mes, 1)) {
+    const corte = finDeMes(mes);
+    const { trm, aproximada } = trmDeMes(trms, mes);
+    let aportadoCOP = 0;
+    let valorCOP = 0;
+    let usoAproximada = false;
+    for (const inst of instrumentos) {
+      const aportado = aportadoHasta(movimientos, inst.id, corte);
+      const ultima = valoracionHasta(valoraciones, inst.id, corte);
+      let valor = aportado;
+      if (ultima) {
+        // Valoracion covers aportes until valorization date; add aportes after that.
+        const aportadoUntilValorizacion = aportadoHasta(movimientos, inst.id, ultima.fecha);
+        valor = ultima.valor + Math.max(0, aportado - aportadoUntilValorizacion);
+      }
+      const a = aCOP(aportado, inst.moneda, trm);
+      const v = aCOP(valor, inst.moneda, trm);
+      if (a === null || v === null) continue; // USD sin ninguna TRM: fuera, como en el portafolio
+      if (inst.moneda === "USD" && aproximada && (aportado !== 0 || valor !== 0)) usoAproximada = true;
+      aportadoCOP += a;
+      valorCOP += v;
+    }
+    salida.push({
+      mes,
+      aportadoCOP,
+      valorCOP,
+      trmAproximada: usoAproximada,
+      metaPlan: plan.find((p) => p.mes === mes)?.ahorro ?? null,
+    });
+  }
+  return salida;
+}
+
+export interface AporteVsMeta {
+  mes: string;
+  meta: number | null;
+  aportadoCOP: number;
+  pct: number | null;
+  faltante: number | null;
+}
+
+export function aporteVsMeta(opts: {
+  instrumentos: AhorroInstrumento[];
+  movimientos: AhorroMovimiento[];
+  trms: Trm[];
+  hoy: string;
+  plan: MesPlan[];
+}): AporteVsMeta {
+  const { instrumentos, movimientos, trms, hoy, plan } = opts;
+  const mes = mesDe(hoy);
+  const trm = trmVigente(trms, hoy);
+  const monedaDe = new Map(instrumentos.map((i) => [i.id, i.moneda] as const));
+
+  const aportadoCOP = movimientos
+    .filter((m) => mesDe(m.fecha) === mes && m.fecha <= hoy)
+    .reduce((s, m) => {
+      const cop = aCOP(signo(m), monedaDe.get(m.instrumento_id) ?? "COP", trm);
+      return s + (cop ?? 0); // USD sin TRM no suma: no hay cómo convertirlo
+    }, 0);
+
+  const meta = plan.find((p) => p.mes === mes)?.ahorro ?? null;
+  return {
+    mes,
+    meta,
+    aportadoCOP,
+    pct: meta !== null && meta > 0 ? (aportadoCOP / meta) * 100 : null,
+    faltante: meta === null ? null : Math.max(0, meta - aportadoCOP),
   };
 }

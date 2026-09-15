@@ -169,3 +169,83 @@ describe("resumenPortafolio", () => {
     expect(r.porTitular).toEqual([]);
   });
 });
+
+import { serieMensual, aporteVsMeta } from "./calculo";
+import type { MesPlan } from "@/lib/plan/calculo";
+
+function mesPlan(mes: string, ahorro: number | null): MesPlan {
+  return {
+    mes, esActual: mes === "2026-09", ingresos: [], fijos: [], totalIngresos: 0, totalFijos: 0,
+    tc: { monto: 0, origen: "real", editable: false, ciclo: mes, referencia: 0, origenReferencia: "real" },
+    ahorro, acumulado: null,
+  };
+}
+
+describe("serieMensual", () => {
+  const instrumentos = [inst({ id: "cop" }), inst({ id: "usd", moneda: "USD" })];
+  const movimientos = [mov("cop", "2026-06-10", "aporte", 1_000_000), mov("usd", "2026-07-05", "aporte", 100), mov("cop", "2026-09-02", "aporte", 500_000)];
+  const valoraciones = [val("cop", "2026-07-20", 1_050_000)];
+  const trms = [trm("2026-08-01", 4000), trm("2026-09-01", 4100)];
+  const plan = [mesPlan("2026-08", 700_000), mesPlan("2026-09", 900_000)];
+
+  it("un punto por mes desde el primer movimiento hasta hoy, sin huecos", () => {
+    const s = serieMensual({ instrumentos, movimientos, valoraciones, trms, hoy: HOY, plan });
+    expect(s.map((p) => p.mes)).toEqual(["2026-06", "2026-07", "2026-08", "2026-09"]);
+  });
+
+  it("aportado acumula; una valoración de julio se mantiene en agosto", () => {
+    const s = serieMensual({ instrumentos, movimientos, valoraciones, trms, hoy: HOY, plan });
+    const ago = s.find((p) => p.mes === "2026-08")!;
+    // cop: valorado 1.05M en julio; usd: 100 × 4000 (TRM de agosto)
+    expect(ago.aportadoCOP).toBe(1_000_000 + 400_000);
+    expect(ago.valorCOP).toBe(1_050_000 + 400_000);
+    expect(ago.trmAproximada).toBe(false);
+    const sep = s.find((p) => p.mes === "2026-09")!;
+    expect(sep.aportadoCOP).toBe(1_500_000 + 410_000);
+    expect(sep.valorCOP).toBe(1_050_000 + 500_000 + 410_000);
+  });
+
+  it("mes anterior a la primera TRM usa la primera conocida y lo marca", () => {
+    const s = serieMensual({ instrumentos, movimientos, valoraciones, trms, hoy: HOY, plan });
+    const jul = s.find((p) => p.mes === "2026-07")!;
+    expect(jul.trmAproximada).toBe(true);
+    expect(jul.aportadoCOP).toBe(1_000_000 + 400_000);
+    expect(s.find((p) => p.mes === "2026-06")!.trmAproximada).toBe(false); // no había USD todavía
+  });
+
+  it("sin ninguna TRM, los USD quedan fuera de la serie", () => {
+    const s = serieMensual({ instrumentos, movimientos, valoraciones, trms: [], hoy: HOY, plan });
+    expect(s.find((p) => p.mes === "2026-09")!.aportadoCOP).toBe(1_500_000);
+  });
+
+  it("metaPlan solo dentro del rango de Plan", () => {
+    const s = serieMensual({ instrumentos, movimientos, valoraciones, trms, hoy: HOY, plan });
+    expect(s.find((p) => p.mes === "2026-06")!.metaPlan).toBeNull();
+    expect(s.find((p) => p.mes === "2026-09")!.metaPlan).toBe(900_000);
+  });
+
+  it("sin movimientos → serie vacía", () => {
+    expect(serieMensual({ instrumentos, movimientos: [], valoraciones: [], trms, hoy: HOY, plan })).toEqual([]);
+  });
+});
+
+describe("aporteVsMeta", () => {
+  const instrumentos = [inst({ id: "cop" }), inst({ id: "usd", moneda: "USD" })];
+  const trms = [trm("2026-09-01", 4000)];
+  const movs = [mov("cop", "2026-09-03", "aporte", 1_000_000), mov("usd", "2026-09-10", "aporte", 100), mov("cop", "2026-09-12", "retiro", 100_000), mov("cop", "2026-08-30", "aporte", 9_000_000), mov("cop", "2026-09-20", "aporte", 9_000_000)];
+
+  it("aportado del mes en COP (aportes − retiros, solo este mes y hasta hoy) contra la meta", () => {
+    const r = aporteVsMeta({ instrumentos, movimientos: movs, trms, hoy: HOY, plan: [mesPlan("2026-09", 2_000_000)] });
+    expect(r).toEqual({ mes: "2026-09", meta: 2_000_000, aportadoCOP: 1_300_000, pct: 65, faltante: 700_000 });
+  });
+
+  it("meta null → pct y faltante null", () => {
+    const r = aporteVsMeta({ instrumentos, movimientos: movs, trms, hoy: HOY, plan: [mesPlan("2026-09", null)] });
+    expect(r).toMatchObject({ meta: null, pct: null, faltante: null, aportadoCOP: 1_300_000 });
+  });
+
+  it("aportado > meta → pct > 100 y faltante 0; meta 0 → pct null", () => {
+    expect(aporteVsMeta({ instrumentos, movimientos: movs, trms, hoy: HOY, plan: [mesPlan("2026-09", 1_000_000)] })).toMatchObject({ pct: 130, faltante: 0 });
+    expect(aporteVsMeta({ instrumentos, movimientos: movs, trms, hoy: HOY, plan: [mesPlan("2026-09", 0)] })).toMatchObject({ pct: null, faltante: 0 });
+  });
+});
