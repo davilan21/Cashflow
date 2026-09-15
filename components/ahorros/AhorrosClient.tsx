@@ -13,6 +13,8 @@ import { FiltroTitular, type ValorFiltro } from "./FiltroTitular";
 import { ResumenPortafolio } from "./ResumenPortafolio";
 import { AporteVsMeta } from "./AporteVsMeta";
 import { GraficaEvolucion } from "./GraficaEvolucion";
+import { ListaInstrumentos } from "./ListaInstrumentos";
+import { DetalleInstrumentoSheet } from "./DetalleInstrumentoSheet";
 
 export function AhorrosClient({
   cuentaId,
@@ -59,10 +61,13 @@ export function AhorrosClient({
   );
   const hayInstrumentos = instrumentos.length > 0;
 
-  // cuentaId, userId, supabase, setInstrumentos, setMovimientos, setValoraciones,
-  // setTrms, mostrar y miembros se usan en las Tasks 13, 14, 15 y 16.
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
+  const detalle = resumen.instrumentos.find((r) => r.instrumento.id === seleccionado) ?? null;
+
+  // cuentaId, userId, supabase, setInstrumentos, setMovimientos, setValoraciones
+  // y setTrms se usan en las Tasks 14, 15 y 16.
   void cuentaId; void userId; void supabase;
-  void setInstrumentos; void setMovimientos; void setValoraciones; void setTrms; void mostrar; void miembros;
+  void setInstrumentos; void setMovimientos; void setValoraciones; void setTrms; void mostrar;
 
   return (
     <>
@@ -75,10 +80,39 @@ export function AhorrosClient({
       {hayInstrumentos && (
         <>
           <FiltroTitular miembros={miembros} valor={filtroTitular} onCambiar={setFiltroTitular} />
-          <ResumenPortafolio resumen={resumen} onEditarTrm={() => {}} />
-          <AporteVsMeta datos={vsMeta} />
-          <GraficaEvolucion puntos={serie} />
+          <div className="lg:grid lg:grid-cols-12 lg:gap-4">
+            <div className="lg:col-span-5">
+              <ResumenPortafolio resumen={resumen} onEditarTrm={() => {}} />
+              <AporteVsMeta datos={vsMeta} />
+              <GraficaEvolucion puntos={serie} />
+            </div>
+            <div className="lg:col-span-7">
+              <ListaInstrumentos
+                resumenes={resumen.instrumentos}
+                miembros={miembros}
+                onSeleccionar={setSeleccionado}
+                onNuevo={() => {}}
+              />
+            </div>
+          </div>
         </>
+      )}
+
+      {detalle && (
+        <DetalleInstrumentoSheet
+          resumen={detalle}
+          movimientos={movimientos.filter((m) => m.instrumento_id === detalle.instrumento.id)}
+          valoraciones={valoraciones.filter((v) => v.instrumento_id === detalle.instrumento.id)}
+          miembros={miembros}
+          onCerrar={() => setSeleccionado(null)}
+          onAportar={() => {}}
+          onRetirar={() => {}}
+          onActualizarValor={() => {}}
+          onEditar={() => {}}
+          onEliminarMovimiento={() => {}}
+          onEliminarValoracion={() => {}}
+          onEliminarInstrumento={() => {}}
+        />
       )}
 
       <Toast mensaje={toast} />
