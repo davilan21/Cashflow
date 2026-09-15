@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/useToast";
 import { hoyISO } from "@/lib/ciclo";
@@ -13,6 +13,7 @@ import {
   eliminarMovimiento,
   guardarValoracion,
   eliminarValoracion,
+  guardarTrm,
 } from "@/lib/ahorros/queries";
 import type {
   AhorroInstrumento,
@@ -36,6 +37,7 @@ import { DetalleInstrumentoSheet } from "./DetalleInstrumentoSheet";
 import { InstrumentoSheet } from "./InstrumentoSheet";
 import { MovimientoSheet } from "./MovimientoSheet";
 import { ValoracionSheet } from "./ValoracionSheet";
+import { TrmSheet } from "./TrmSheet";
 
 const claveValoracion = (instrumentoId: string, fecha: string) => `${instrumentoId}|${fecha}`;
 
@@ -219,8 +221,57 @@ export function AhorrosClient({
     }
   };
 
-  // setTrms se usa en la Task 16.
-  void setTrms;
+  const [hojaTrm, setHojaTrm] = useState(false);
+  const [actualizandoTrm, setActualizandoTrm] = useState(false);
+  const [errorTrm, setErrorTrm] = useState<string | null>(null);
+
+  const guardarTrmUI = (valor: number, fuente: "manual" | "datos.gov.co") => {
+    const clave = `trm|${hoy}`;
+    const miGen = (generacionRef.current.get(clave) ?? 0) + 1;
+    generacionRef.current.set(clave, miGen);
+    const existente = trms.find((t) => t.fecha === hoy);
+    const provisional: Trm = { cuenta_id: cuentaId, fecha: hoy, valor, fuente, created_at: "" };
+    setTrms((prev) => [...prev.filter((t) => t.fecha !== hoy), provisional]);
+    if (fuente === "manual") setHojaTrm(false);
+
+    const esUltima = () => generacionRef.current.get(clave) === miGen;
+    void encolar(clave, async () => {
+      const { data, error } = await guardarTrm(supabase, cuentaId, hoy, valor, fuente);
+      if (error || !data) {
+        if (esUltima()) {
+          setTrms((prev) => (existente ? prev.map((t) => (t.fecha === hoy ? existente : t)) : prev.filter((t) => t.fecha !== hoy)));
+        }
+        mostrar("No se pudo guardar la TRM");
+        return;
+      }
+      if (esUltima()) setTrms((prev) => prev.map((t) => (t.fecha === hoy ? data : t)));
+    }).catch(() => mostrar("Falló al guardar la TRM"));
+  };
+
+  const actualizarTrmAutomatica = async () => {
+    setActualizandoTrm(true);
+    setErrorTrm(null);
+    try {
+      const res = await fetch("/api/trm");
+      const body = await res.json();
+      if (!res.ok) {
+        setErrorTrm(body.error ?? `error ${res.status}`);
+        return;
+      }
+      guardarTrmUI(body.valor, body.fuente);
+    } catch {
+      setErrorTrm("no se pudo conectar");
+    } finally {
+      setActualizandoTrm(false);
+    }
+  };
+
+  useEffect(() => {
+    const hayUSD = instrumentos.some((i) => i.moneda === "USD");
+    const hayTrmHoy = trms.some((t) => t.fecha === hoy);
+    if (hayUSD && !hayTrmHoy) actualizarTrmAutomatica();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -237,7 +288,7 @@ export function AhorrosClient({
           <FiltroTitular miembros={miembros} valor={filtroTitular} onCambiar={setFiltroTitular} />
           <div className="lg:grid lg:grid-cols-12 lg:gap-4">
             <div className="lg:col-span-5">
-              <ResumenPortafolio resumen={resumen} onEditarTrm={() => {}} />
+              <ResumenPortafolio resumen={resumen} onEditarTrm={() => setHojaTrm(true)} />
               <AporteVsMeta datos={vsMeta} />
               <GraficaEvolucion puntos={serie} />
             </div>
@@ -293,6 +344,17 @@ export function AhorrosClient({
           aportado={resumen.instrumentos.find((r) => r.instrumento.id === hojaValoracion.id)?.aportado ?? 0}
           onGuardar={(valor, fecha) => guardarValoracionUI(hojaValoracion.id, valor, fecha)}
           onCerrar={() => setHojaValoracion(null)}
+        />
+      )}
+
+      {hojaTrm && (
+        <TrmSheet
+          trmActual={trms.find((t) => t.fecha === hoy) ?? trms[0] ?? null}
+          actualizando={actualizandoTrm}
+          errorActualizar={errorTrm}
+          onActualizarAutomatica={actualizarTrmAutomatica}
+          onGuardarManual={(v) => guardarTrmUI(v, "manual")}
+          onCerrar={() => setHojaTrm(false)}
         />
       )}
 
