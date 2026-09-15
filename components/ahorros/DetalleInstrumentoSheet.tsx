@@ -17,7 +17,7 @@ function FilaConBorrar({ texto, monto, onBorrar }: { texto: string; monto: strin
       <span className="flex-1 text-muted">{texto}</span>
       <span className="num text-ink">{monto}</span>
       {confirmando ? (
-        <button type="button" onClick={onBorrar} className="text-alerta text-[12px] font-medium cursor-pointer min-h-[36px] px-1">
+        <button type="button" onClick={onBorrar} className="text-alerta text-[12px] font-medium cursor-pointer min-h-[44px] min-w-[44px] px-1">
           Confirmar
         </button>
       ) : (
@@ -25,7 +25,7 @@ function FilaConBorrar({ texto, monto, onBorrar }: { texto: string; monto: strin
           type="button"
           aria-label="Eliminar"
           onClick={() => setConfirmando(true)}
-          className="text-muted cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
+          className="text-muted cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
         >
           <IconoPapelera className="w-4 h-4" />
         </button>
