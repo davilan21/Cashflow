@@ -211,8 +211,14 @@ Decisiones:
 2. Si no: `GET https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde DESC&$limit=1`
    con timeout de 5 s. Valida: array no vacío, `valor` numérico en
    `[1000, 20000]`, `vigenciadesde` parseable a `YYYY-MM-DD`. `upsert` con
-   `fuente = 'datos.gov.co'` en la fecha de `vigenciadesde`. Devuelve
-   `{ valor, fecha, fuente }`.
+   `fuente = 'datos.gov.co'` en la fecha de **`hoy`** — no en `vigenciadesde`.
+   Colombia suele publicar la TRM el día hábil anterior al que rige, así que
+   `vigenciadesde` puede ser mañana; toda la app (el propio chequeo de "¿ya
+   hay fila de hoy?", y `trmVigente()` en `lib/ahorros/calculo.ts`) lee y
+   filtra por "el día en cuestión", nunca por la fecha de vigencia externa —
+   usar `vigenciadesde` como llave de guardado dejaría dos filas por un
+   mismo fetch cuando difieren de `hoy`. Devuelve `{ valor, fecha: hoy,
+   fuente }`.
 3. Cualquier fallo → `{ error: <causa legible> }`. La pantalla usa la última
    TRM guardada y dice "TRM del DD/MM (no se pudo actualizar)". **Nunca se
    inventa un valor.**
