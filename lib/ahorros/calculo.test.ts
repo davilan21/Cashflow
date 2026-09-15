@@ -98,3 +98,74 @@ describe("resumenInstrumento", () => {
     expect(r.valor).toBe(1);
   });
 });
+
+import { resumenPortafolio } from "./calculo";
+
+describe("resumenPortafolio", () => {
+  const instrumentos = [
+    inst({ id: "cdtD", tipo: "cdt", titular: "u1", vencimiento: "2027-01-01" }),
+    inst({ id: "accM", tipo: "acciones", moneda: "USD", titular: "u2" }),
+    inst({ id: "fondoH", tipo: "fondo" }), // titular null = hogar
+    inst({ id: "viejo", tipo: "cuenta", activo: false }),
+  ];
+  const movimientos = [
+    mov("cdtD", "2026-01-10", "aporte", 3_000_000),
+    mov("accM", "2026-02-01", "aporte", 100),
+    mov("fondoH", "2026-03-01", "aporte", 1_000_000),
+    mov("viejo", "2026-01-01", "aporte", 500_000),
+  ];
+  const valoraciones = [val("cdtD", "2026-09-01", 3_300_000), val("accM", "2026-09-01", 125)];
+  const trms = [trm("2026-09-01", 4000)];
+  const base = { instrumentos, movimientos, valoraciones, trms, hoy: HOY };
+
+  it("totales en COP con TRM; inactivos cuentan por defecto", () => {
+    const r = resumenPortafolio(base);
+    // cdt 3.3M + acc 125×4000=500k + fondo 1M + viejo 500k
+    expect(r.totalValorCOP).toBe(5_300_000);
+    expect(r.totalAportadoCOP).toBe(3_000_000 + 400_000 + 1_000_000 + 500_000);
+    expect(r.rendimientoCOP).toBe(400_000);
+    expect(r.rendimientoPct).toBeCloseTo((400_000 / 4_900_000) * 100, 6);
+    expect(r.usdSinConvertir).toBe(0);
+    expect(r.trm?.valor).toBe(4000);
+  });
+
+  it("soloActivos excluye los liquidados", () => {
+    const r = resumenPortafolio({ ...base, filtro: { soloActivos: true } });
+    expect(r.totalValorCOP).toBe(4_800_000);
+    expect(r.instrumentos.map((i) => i.instrumento.id)).not.toContain("viejo");
+  });
+
+  it("sin TRM: los USD quedan fuera del total y se reportan aparte", () => {
+    const r = resumenPortafolio({ ...base, trms: [] });
+    expect(r.totalValorCOP).toBe(4_800_000);
+    expect(r.usdSinConvertir).toBe(125);
+    expect(r.trm).toBeNull();
+    expect(r.instrumentos.find((i) => i.instrumento.id === "accM")?.valorCOP).toBeNull();
+  });
+
+  it("orden por valorCOP desc, los sin COP al final", () => {
+    const r = resumenPortafolio({ ...base, trms: [] });
+    expect(r.instrumentos.map((i) => i.instrumento.id)).toEqual(["cdtD", "fondoH", "viejo", "accM"]);
+  });
+
+  it("porTitular y porTipo suman 100 y el null cae en 'hogar'", () => {
+    const r = resumenPortafolio(base);
+    const suma = (p: { pct: number }[]) => p.reduce((s, x) => s + x.pct, 0);
+    expect(suma(r.porTitular)).toBeCloseTo(100, 2);
+    expect(suma(r.porTipo)).toBeCloseTo(100, 2);
+    expect(r.porTitular.find((p) => p.clave === "hogar")?.valorCOP).toBe(1_500_000);
+    expect(r.porTitular.find((p) => p.clave === "u1")?.valorCOP).toBe(3_300_000);
+    expect(r.porTipo.find((p) => p.clave === "cdt")?.valorCOP).toBe(3_300_000);
+  });
+
+  it("filtro por titular: solo ese titular; null = hogar", () => {
+    expect(resumenPortafolio({ ...base, filtro: { titular: "u1" } }).totalValorCOP).toBe(3_300_000);
+    expect(resumenPortafolio({ ...base, filtro: { titular: null } }).totalValorCOP).toBe(1_500_000); // fondo + viejo (hogar)
+  });
+
+  it("portafolio vacío: ceros y pct null, sin lanzar", () => {
+    const r = resumenPortafolio({ instrumentos: [], movimientos: [], valoraciones: [], trms: [], hoy: HOY });
+    expect(r).toMatchObject({ totalValorCOP: 0, totalAportadoCOP: 0, rendimientoCOP: 0, rendimientoPct: null, usdSinConvertir: 0 });
+    expect(r.porTitular).toEqual([]);
+  });
+});

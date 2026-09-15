@@ -87,3 +87,81 @@ export function resumenInstrumento(
     cdt: infoCdt(inst, hoy),
   };
 }
+
+export interface Participacion {
+  clave: string;
+  valorCOP: number;
+  pct: number;
+}
+
+export interface FiltroPortafolio {
+  /** undefined = todos; null = del hogar; string = ese miembro. */
+  titular?: string | null;
+  soloActivos?: boolean;
+}
+
+export interface ResumenPortafolio {
+  instrumentos: ResumenInstrumento[];
+  totalAportadoCOP: number;
+  totalValorCOP: number;
+  rendimientoCOP: number;
+  rendimientoPct: number | null;
+  /** Σ valor (en USD) de los instrumentos USD que no se pudieron convertir por falta de TRM. */
+  usdSinConvertir: number;
+  trm: Trm | null;
+  porTitular: Participacion[];
+  porTipo: Participacion[];
+}
+
+function participaciones(items: ResumenInstrumento[], clave: (r: ResumenInstrumento) => string): Participacion[] {
+  const acum = new Map<string, number>();
+  for (const r of items) {
+    if (r.valorCOP === null) continue;
+    const k = clave(r);
+    acum.set(k, (acum.get(k) ?? 0) + r.valorCOP);
+  }
+  const total = Array.from(acum.values()).reduce((s, v) => s + v, 0);
+  return Array.from(acum.entries())
+    .map(([k, v]) => ({ clave: k, valorCOP: v, pct: total > 0 ? (v / total) * 100 : 0 }))
+    .sort((a, b) => b.valorCOP - a.valorCOP);
+}
+
+export function resumenPortafolio(opts: {
+  instrumentos: AhorroInstrumento[];
+  movimientos: AhorroMovimiento[];
+  valoraciones: AhorroValoracion[];
+  trms: Trm[];
+  hoy: string;
+  filtro?: FiltroPortafolio;
+}): ResumenPortafolio {
+  const { movimientos, valoraciones, trms, hoy, filtro = {} } = opts;
+  const trm = trmVigente(trms, hoy);
+
+  const seleccion = opts.instrumentos.filter((i) => {
+    if (filtro.soloActivos && !i.activo) return false;
+    if (filtro.titular !== undefined && i.titular !== filtro.titular) return false;
+    return true;
+  });
+
+  const instrumentos = seleccion
+    .map((i) => resumenInstrumento(i, movimientos, valoraciones, trm, hoy))
+    // Los que tienen COP primero, de mayor a menor; los sin TRM al final.
+    .sort((a, b) => (b.valorCOP ?? -Infinity) - (a.valorCOP ?? -Infinity));
+
+  const conCOP = instrumentos.filter((r) => r.valorCOP !== null && r.aportadoCOP !== null);
+  const totalAportadoCOP = conCOP.reduce((s, r) => s + (r.aportadoCOP as number), 0);
+  const totalValorCOP = conCOP.reduce((s, r) => s + (r.valorCOP as number), 0);
+  const rendimientoCOP = totalValorCOP - totalAportadoCOP;
+
+  return {
+    instrumentos,
+    totalAportadoCOP,
+    totalValorCOP,
+    rendimientoCOP,
+    rendimientoPct: totalAportadoCOP > 0 ? (rendimientoCOP / totalAportadoCOP) * 100 : null,
+    usdSinConvertir: instrumentos.filter((r) => r.valorCOP === null).reduce((s, r) => s + r.valor, 0),
+    trm,
+    porTitular: participaciones(instrumentos, (r) => r.instrumento.titular ?? "hogar"),
+    porTipo: participaciones(instrumentos, (r) => r.instrumento.tipo),
+  };
+}
