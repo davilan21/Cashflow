@@ -183,6 +183,7 @@ export function PlanClient({
         montoActual: m.tc.monto,
         referencia: { etiqueta: capitalizar(etiquetaOrigenTC(m.tc.origenReferencia)), monto: m.tc.referencia },
         tieneAjuste: m.tc.origen === "manual",
+        etiquetaVolver: "Volver al estimado",
       };
     }
     const linea = [...m.ingresos, ...m.fijos].find((l) => l.rubroId === editando.rubroId);
@@ -192,6 +193,7 @@ export function PlanClient({
       montoActual: linea.monto,
       referencia: { etiqueta: "Por defecto", monto: linea.montoDefault },
       tieneAjuste: linea.ajustado,
+      etiquetaVolver: "Volver al valor por defecto",
     };
   })();
 

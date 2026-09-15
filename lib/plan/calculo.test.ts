@@ -235,4 +235,21 @@ describe("calcularPlan", () => {
     expect(nov.ahorro).toBe(7_000_000);
     expect(nov.acumulado).toBe(7_000_000);
   });
+
+  it("un mes intermedio sin ingreso no rompe el acumulado: no aporta y el corrido se mantiene", () => {
+    const dosIngresos = [
+      rubro({ id: "nomina1", tipo: "ingreso", monto_default: 10_000_000, desde: "2026-01", hasta: "2026-10" }),
+      rubro({ id: "nomina2", tipo: "ingreso", monto_default: 10_000_000, desde: "2026-12" }),
+    ];
+    const plan = calcularPlan({ rubros: dosIngresos, ajustes: [], gastos, hoy });
+    const oct = plan.find((m) => m.mes === "2026-10")!;
+    const nov = plan.find((m) => m.mes === "2026-11")!;
+    const dic = plan.find((m) => m.mes === "2026-12")!;
+    // Oct está "en curso" (16-sep..15-oct) y no tiene gasto real en ese ciclo,
+    // así que tc.monto es 0 por ritmo: ahorro = 10.000.000 − 0 − 0.
+    expect(oct.ahorro).toBe(10_000_000);
+    expect(nov.ahorro).toBeNull();
+    expect(nov.acumulado).toBe(oct.acumulado);
+    expect(dic.acumulado).toBe(nov.acumulado! + dic.ahorro!);
+  });
 });

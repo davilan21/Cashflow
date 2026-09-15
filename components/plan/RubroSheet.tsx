@@ -8,6 +8,8 @@ import type { NuevoRubro, PlanRubro, TipoRubro } from "@/lib/types";
 
 const campo = "w-full border-[1.5px] border-line rounded-lg px-3 py-3 text-[15px] text-ink mt-1.5 bg-surface";
 const etiqueta = "block text-[11px] tracking-wider uppercase text-muted font-semibold mt-3.5";
+// Mismo check que la base de datos (0011_plan_mensual.sql): 'YYYY-MM'.
+const MES_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export function RubroSheet({
   inicial,
@@ -46,11 +48,15 @@ export function RubroSheet({
       setError("Escribí un monto (puede ser 0).");
       return null;
     }
-    if (!/^\d{4}-\d{2}$/.test(desde)) {
+    if (!MES_RE.test(desde)) {
       setError("Elegí el mes desde el que aplica.");
       return null;
     }
     const hastaFinal = puntual ? desde : hasta || null;
+    if (hastaFinal !== null && !MES_RE.test(hastaFinal)) {
+      setError("Elegí el mes final con el formato AAAA-MM.");
+      return null;
+    }
     if (hastaFinal !== null && hastaFinal < desde) {
       setError("El mes final no puede ser antes del inicial.");
       return null;

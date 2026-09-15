@@ -31,8 +31,8 @@ bus"), topes con proyección, historial por ciclo y exportación/importación.
 ## 2. Correr las migraciones
 
 Las migraciones viven en `supabase/migrations/` y crean las tablas
-`expenses`, `settings`, `categories`, la función `ciclo_de()`, los índices y
-las políticas de RLS.
+`expenses`, `settings`, `categories`, `plan_rubros`/`plan_ajustes` (plan
+mensual), la función `ciclo_de()`, los índices y las políticas de RLS.
 
 **Opción A — Supabase CLI, contra tu proyecto:**
 
@@ -47,9 +47,15 @@ Supabase y ejecuta, en orden, el contenido de:
 
 1. `supabase/migrations/0001_init.sql`
 2. `supabase/migrations/0002_seed_categories.sql`
+3. `supabase/migrations/0003_cuentas_compartidas.sql`
+4. `supabase/migrations/0004_gmail_integracion.sql`
+5. `supabase/migrations/0011_plan_mensual.sql`
+
+Los números 0005–0010 están reservados por la rama de Flujo de caja (sin
+mergear); 0011 se eligió para no colisionar.
 
 Verifica que quedaron 9 filas en `categories` y que RLS está habilitado en
-las tres tablas (**Database → Tables**, columna *RLS enabled*).
+todas las tablas (**Database → Tables**, columna *RLS enabled*).
 
 ## 3. Variables de entorno
 

@@ -34,7 +34,11 @@ export function ResumenMes({ mes, ultimo }: { mes: MesPlan; ultimo: MesPlan }) {
       </div>
 
       {ultimo.acumulado !== null && (
-        <div className="mt-3.5 px-2.5 py-2 rounded-lg text-[13px] leading-relaxed bg-[#EEF4EF] text-[#3A6644]">
+        <div
+          className={`mt-3.5 px-2.5 py-2 rounded-lg text-[13px] leading-relaxed ${
+            ultimo.acumulado < 0 ? "bg-[#FBEEED] text-[#8E3733]" : "bg-[#EEF4EF] text-[#3A6644]"
+          }`}
+        >
           A este ritmo, en {etiquetaMes(ultimo.mes).toLowerCase()} acumulás {textoAhorro(ultimo.acumulado)}.
         </div>
       )}

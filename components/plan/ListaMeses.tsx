@@ -2,7 +2,7 @@
 
 import { etiquetaMes } from "@/lib/plan/etiquetas";
 import type { MesPlan } from "@/lib/plan/calculo";
-import { IconoChevron } from "./Iconos";
+import { IconoChevron } from "@/components/ui/Iconos";
 import { DetalleMes } from "./DetalleMes";
 import { textoAhorro, colorAhorro } from "./ResumenMes";
 

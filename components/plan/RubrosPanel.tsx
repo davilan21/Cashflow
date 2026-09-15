@@ -3,7 +3,7 @@
 import { pesos } from "@/lib/money";
 import { etiquetaVigencia } from "@/lib/plan/etiquetas";
 import type { PlanRubro, TipoRubro } from "@/lib/types";
-import { IconoLapiz, IconoMas } from "./Iconos";
+import { IconoLapiz, IconoMas } from "@/components/ui/Iconos";
 
 function Lista({
   titulo,

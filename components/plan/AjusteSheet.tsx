@@ -11,6 +11,7 @@ export function AjusteSheet({
   montoActual,
   referencia,
   tieneAjuste,
+  etiquetaVolver,
   onGuardar,
   onQuitar,
   onCerrar,
@@ -19,6 +20,7 @@ export function AjusteSheet({
   montoActual: number;
   referencia: { etiqueta: string; monto: number };
   tieneAjuste: boolean;
+  etiquetaVolver: string;
   onGuardar: (monto: number) => void;
   onQuitar: () => void;
   onCerrar: () => void;
@@ -79,7 +81,7 @@ export function AjusteSheet({
         </Button>
         {tieneAjuste && (
           <Button onClick={onQuitar} disabled={enviando}>
-            Volver a {referencia.etiqueta.toLowerCase()}
+            {etiquetaVolver}
           </Button>
         )}
       </div>

@@ -3,7 +3,7 @@
 import { pesos } from "@/lib/money";
 import { etiquetaOrigenTC } from "@/lib/plan/etiquetas";
 import type { LineaPlan, MesPlan } from "@/lib/plan/calculo";
-import { IconoLapiz } from "./Iconos";
+import { IconoLapiz } from "@/components/ui/Iconos";
 import { textoAhorro, colorAhorro } from "./ResumenMes";
 
 function Linea({

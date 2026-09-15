@@ -36,6 +36,9 @@ create table plan_ajustes (
   unique nulls not distinct (cuenta_id, mes, rubro_id)
 );
 
+-- el cascade de plan_rubros → plan_ajustes busca por rubro_id
+create index plan_ajustes_rubro_idx on plan_ajustes (rubro_id);
+
 -- Triggers existentes, reutilizados (definidos en 0001 y 0003).
 create trigger plan_rubros_set_created_by
   before insert on plan_rubros
