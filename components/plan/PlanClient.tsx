@@ -12,6 +12,7 @@ import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
 import { SubTabs, type VistaPlan } from "./SubTabs";
 import { ResumenMes } from "./ResumenMes";
+import { GraficaAhorro } from "./GraficaAhorro";
 import { ListaMeses } from "./ListaMeses";
 import { AjusteSheet } from "./AjusteSheet";
 import { RubrosPanel } from "./RubrosPanel";
@@ -217,6 +218,13 @@ export function PlanClient({
             </Banner>
           )}
           <ResumenMes mes={actual} ultimo={ultimo} />
+          <GraficaAhorro
+            plan={plan}
+            onSeleccionar={(mes) => {
+              setAbierto(mes);
+              document.getElementById(`mes-${mes}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          />
           <ListaMeses plan={plan} abierto={abierto} onAbrir={setAbierto} onEditar={(mes, rubroId) => setEditando({ mes, rubroId })} />
         </>
       )}
