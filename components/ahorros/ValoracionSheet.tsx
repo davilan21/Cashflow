@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { formatearMiles, parsearMonto } from "@/lib/plan/formato";
@@ -8,16 +8,17 @@ import { formatearDecimal, parsearDecimal } from "@/lib/ahorros/formato";
 import { hoyISO } from "@/lib/ciclo";
 import { pesos } from "@/lib/money";
 import { dolares } from "@/lib/ahorros/formato";
-import type { AhorroInstrumento } from "@/lib/types";
+import { aportadoHasta } from "@/lib/ahorros/calculo";
+import type { AhorroInstrumento, AhorroMovimiento } from "@/lib/types";
 
 export function ValoracionSheet({
   instrumento,
-  aportado,
+  movimientos,
   onGuardar,
   onCerrar,
 }: {
   instrumento: AhorroInstrumento;
-  aportado: number;
+  movimientos: AhorroMovimiento[];
   onGuardar: (valor: number, fecha: string) => void;
   onCerrar: () => void;
 }) {
@@ -27,6 +28,11 @@ export function ValoracionSheet({
   const [fecha, setFecha] = useState(hoyISO());
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Recalcula con la fecha elegida, no con hoy, para que coincida con lo que se está valorando.
+  const aportado = useMemo(
+    () => aportadoHasta(movimientos, instrumento.id, fecha),
+    [movimientos, instrumento.id, fecha]
+  );
 
   const guardar = () => {
     const n = esUSD ? parsearDecimal(valor) : parsearMonto(valor);

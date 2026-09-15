@@ -76,20 +76,37 @@ export function AhorrosClient({
     () => resumenPortafolio({ instrumentos, movimientos, valoraciones, trms, hoy, filtro: { titular: filtroTitular } }),
     [instrumentos, movimientos, valoraciones, trms, hoy, filtroTitular]
   );
+  // Sin filtro de titular a propósito: la meta de ahorro del Plan es una cifra
+  // del hogar, no por persona, así que el aporte contra esa meta también debe serlo.
   const vsMeta = useMemo(
     () => aporteVsMeta({ instrumentos, movimientos, trms, hoy, plan }),
     [instrumentos, movimientos, trms, hoy, plan]
   );
-  const serie = useMemo(
-    () => serieMensual({ instrumentos, movimientos, valoraciones, trms, hoy, plan }),
-    [instrumentos, movimientos, valoraciones, trms, hoy, plan]
-  );
+  const serie = useMemo(() => {
+    const instrumentosFiltrados = resumen.instrumentos.map((r) => r.instrumento);
+    const idsFiltrados = new Set(instrumentosFiltrados.map((i) => i.id));
+    const movimientosFiltrados = movimientos.filter((m) => idsFiltrados.has(m.instrumento_id));
+    const valoracionesFiltradas = valoraciones.filter((v) => idsFiltrados.has(v.instrumento_id));
+    return serieMensual({
+      instrumentos: instrumentosFiltrados,
+      movimientos: movimientosFiltrados,
+      valoraciones: valoracionesFiltradas,
+      trms,
+      hoy,
+      plan,
+    });
+  }, [resumen, movimientos, valoraciones, trms, hoy, plan]);
   const hayInstrumentos = instrumentos.length > 0;
 
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const detalle = resumen.instrumentos.find((r) => r.instrumento.id === seleccionado) ?? null;
 
   const [hojaInstrumento, setHojaInstrumento] = useState<{ instrumento: AhorroInstrumento | null } | null>(null);
+  const tieneMovimientosInstrumento = Boolean(
+    hojaInstrumento?.instrumento &&
+      (movimientos.some((m) => m.instrumento_id === hojaInstrumento.instrumento!.id) ||
+        valoraciones.some((v) => v.instrumento_id === hojaInstrumento.instrumento!.id))
+  );
 
   const guardarInstrumento = async (datos: NuevoInstrumento) => {
     if (hojaInstrumento?.instrumento) {
@@ -288,7 +305,12 @@ export function AhorrosClient({
           <FiltroTitular miembros={miembros} valor={filtroTitular} onCambiar={setFiltroTitular} />
           <div className="lg:grid lg:grid-cols-12 lg:gap-4">
             <div className="lg:col-span-5">
-              <ResumenPortafolio resumen={resumen} onEditarTrm={() => setHojaTrm(true)} />
+              <ResumenPortafolio
+                resumen={resumen}
+                onEditarTrm={() => setHojaTrm(true)}
+                actualizando={actualizandoTrm}
+                error={errorTrm}
+              />
               <AporteVsMeta datos={vsMeta} />
               <GraficaEvolucion puntos={serie} />
             </div>
@@ -325,6 +347,7 @@ export function AhorrosClient({
         <InstrumentoSheet
           inicial={hojaInstrumento.instrumento}
           miembros={miembros}
+          tieneMovimientos={tieneMovimientosInstrumento}
           onGuardar={guardarInstrumento}
           onCerrar={() => setHojaInstrumento(null)}
         />
@@ -341,7 +364,7 @@ export function AhorrosClient({
       {hojaValoracion && (
         <ValoracionSheet
           instrumento={hojaValoracion}
-          aportado={resumen.instrumentos.find((r) => r.instrumento.id === hojaValoracion.id)?.aportado ?? 0}
+          movimientos={movimientos}
           onGuardar={(valor, fecha) => guardarValoracionUI(hojaValoracion.id, valor, fecha)}
           onCerrar={() => setHojaValoracion(null)}
         />

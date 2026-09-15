@@ -13,14 +13,18 @@ const etiqueta = "block text-[11px] tracking-wider uppercase text-muted font-sem
 export function InstrumentoSheet({
   inicial,
   miembros,
+  tieneMovimientos,
   onGuardar,
   onCerrar,
 }: {
   inicial: AhorroInstrumento | null;
   miembros: Miembro[];
+  /** true si el instrumento ya tiene movimientos o valoraciones guardados. */
+  tieneMovimientos: boolean;
   onGuardar: (datos: NuevoInstrumento) => void;
   onCerrar: () => void;
 }) {
+  const monedaBloqueada = inicial !== null && tieneMovimientos;
   const [nombre, setNombre] = useState(inicial?.nombre ?? "");
   const [tipo, setTipo] = useState<TipoInstrumento>(inicial?.tipo ?? "cdt");
   const [moneda, setMoneda] = useState<Moneda>(inicial?.moneda ?? "COP");
@@ -95,15 +99,21 @@ export function InstrumentoSheet({
             type="button"
             role="radio"
             aria-checked={moneda === m}
-            onClick={() => setMoneda(m)}
-            className={`flex-1 min-h-[44px] rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
-              moneda === m ? "border-ink bg-ink text-white font-medium" : "border-line bg-surface text-muted"
-            }`}
+            disabled={monedaBloqueada}
+            onClick={() => !monedaBloqueada && setMoneda(m)}
+            className={`flex-1 min-h-[44px] rounded-xl border text-[13px] transition-colors duration-200 ${
+              monedaBloqueada ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+            } ${moneda === m ? "border-ink bg-ink text-white font-medium" : "border-line bg-surface text-muted"}`}
           >
             {m}
           </button>
         ))}
       </div>
+      {monedaBloqueada && (
+        <div className="text-[12px] text-muted mt-1.5">
+          No se puede cambiar la moneda de un ahorro con movimientos o valoraciones registrados.
+        </div>
+      )}
 
       {miembros.length > 1 && (
         <>

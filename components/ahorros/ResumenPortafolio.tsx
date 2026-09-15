@@ -10,8 +10,21 @@ function textoRendimiento(v: number, pct: number | null): string {
   return pct === null ? base : `${base} (${signo}${Math.abs(pct).toFixed(1)}%)`;
 }
 
-export function ResumenPortafolio({ resumen, onEditarTrm }: { resumen: Resumen; onEditarTrm: () => void }) {
+export function ResumenPortafolio({
+  resumen,
+  onEditarTrm,
+  actualizando,
+  error,
+}: {
+  resumen: Resumen;
+  onEditarTrm: () => void;
+  actualizando: boolean;
+  error: string | null;
+}) {
   const color = resumen.rendimientoCOP < 0 ? "text-alerta" : "text-ok";
+  const totalUSD = resumen.instrumentos
+    .filter((r) => r.instrumento.moneda === "USD")
+    .reduce((s, r) => s + r.valor, 0);
   return (
     <div className="bg-surface border border-line rounded-2xl p-4 mb-3.5">
       <div className="text-[11px] tracking-wider uppercase text-muted font-semibold mb-1">Ahorrado</div>
@@ -21,18 +34,23 @@ export function ResumenPortafolio({ resumen, onEditarTrm }: { resumen: Resumen; 
         aportado {pesos(resumen.totalAportadoCOP)} · rendimiento {textoRendimiento(resumen.rendimientoCOP, resumen.rendimientoPct)}
       </div>
 
-      {resumen.usdSinConvertir > 0 && (
-        <div className="text-[13px] text-aviso mt-1">
-          de los cuales {dolares(resumen.usdSinConvertir)} sin convertir — sin TRM
-        </div>
-      )}
+      {totalUSD > 0 &&
+        (resumen.usdSinConvertir > 0 ? (
+          <div className="text-[13px] text-aviso mt-1">
+            de los cuales {dolares(resumen.usdSinConvertir)} sin convertir — sin TRM
+          </div>
+        ) : (
+          <div className="text-[13px] text-muted mt-1">de los cuales {dolares(totalUSD)}</div>
+        ))}
 
       <button
         type="button"
         onClick={onEditarTrm}
         className="mt-3 flex items-center gap-1.5 min-h-[36px] text-[12px] text-muted cursor-pointer"
       >
-        {resumen.trm ? (
+        {actualizando ? (
+          "actualizando…"
+        ) : resumen.trm ? (
           <>
             TRM {pesos(resumen.trm.valor)} · {etiquetaFecha(resumen.trm.fecha)} ·{" "}
             {resumen.trm.fuente === "manual" ? "manual" : "automática"}
@@ -42,6 +60,9 @@ export function ResumenPortafolio({ resumen, onEditarTrm }: { resumen: Resumen; 
         )}
         <IconoLapiz className="w-4 h-4" />
       </button>
+      {!actualizando && error && (
+        <div className="text-[12px] text-aviso mt-1">No se pudo actualizar la TRM automáticamente.</div>
+      )}
     </div>
   );
 }

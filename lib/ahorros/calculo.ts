@@ -250,6 +250,8 @@ export interface AporteVsMeta {
   mes: string;
   meta: number | null;
   aportadoCOP: number;
+  /** Σ en USD de los movimientos del mes de instrumentos USD que no se pudieron convertir por falta de TRM. */
+  usdSinConvertir: number;
   pct: number | null;
   faltante: number | null;
 }
@@ -266,18 +268,24 @@ export function aporteVsMeta(opts: {
   const trm = trmVigente(trms, hoy);
   const monedaDe = new Map(instrumentos.map((i) => [i.id, i.moneda] as const));
 
-  const aportadoCOP = movimientos
-    .filter((m) => mesDe(m.fecha) === mes && m.fecha <= hoy)
-    .reduce((s, m) => {
-      const cop = aCOP(signo(m), monedaDe.get(m.instrumento_id) ?? "COP", trm);
-      return s + (cop ?? 0); // USD sin TRM no suma: no hay cómo convertirlo
-    }, 0);
+  let aportadoCOP = 0;
+  let usdSinConvertir = 0;
+  for (const m of movimientos) {
+    if (mesDe(m.fecha) !== mes || m.fecha > hoy) continue;
+    const cop = aCOP(signo(m), monedaDe.get(m.instrumento_id) ?? "COP", trm);
+    if (cop === null) {
+      usdSinConvertir += signo(m); // USD sin TRM: se reporta aparte, no se pierde en silencio
+    } else {
+      aportadoCOP += cop;
+    }
+  }
 
   const meta = plan.find((p) => p.mes === mes)?.ahorro ?? null;
   return {
     mes,
     meta,
     aportadoCOP,
+    usdSinConvertir,
     pct: meta !== null && meta > 0 ? (aportadoCOP / meta) * 100 : null,
     faltante: meta === null ? null : Math.max(0, meta - aportadoCOP),
   };

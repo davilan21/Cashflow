@@ -244,7 +244,7 @@ describe("aporteVsMeta", () => {
 
   it("aportado del mes en COP (aportes − retiros, solo este mes y hasta hoy) contra la meta", () => {
     const r = aporteVsMeta({ instrumentos, movimientos: movs, trms, hoy: HOY, plan: [mesPlan("2026-09", 2_000_000)] });
-    expect(r).toEqual({ mes: "2026-09", meta: 2_000_000, aportadoCOP: 1_300_000, pct: 65, faltante: 700_000 });
+    expect(r).toEqual({ mes: "2026-09", meta: 2_000_000, aportadoCOP: 1_300_000, usdSinConvertir: 0, pct: 65, faltante: 700_000 });
   });
 
   it("meta null → pct y faltante null", () => {

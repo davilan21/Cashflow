@@ -51,3 +51,23 @@ describe("resolverTrmDeHoy", () => {
     expect(r.data?.valor).toBe(4200);
   });
 });
+
+describe("app/api/trm/route.ts — contrato de la fecha (regresión)", () => {
+  it("guardarTrm(...) y el JSON de respuesta deben usar siempre `hoy`, nunca `r.data.fecha`", () => {
+    // Este archivo (lib/ahorros/trm.ts) reporta correctamente la fecha real
+    // externa en `data.fecha` de obtenerTrmDatosGov — eso NO es el bug, es el
+    // comportamiento correcto de esta función.
+    //
+    // El bug de la regresión pasada estaba en app/api/trm/route.ts, que no
+    // tiene arnés de pruebas en este repo (requeriría mockear next/server y
+    // @/lib/supabase/server, que lee cookies). Confirmado por inspección el
+    // 2026-09-15: la ruta calcula `hoy = hoyISO()`, llama
+    // `guardarTrm(supabase, cuenta.data, hoy, r.data.valor, "datos.gov.co")`
+    // (usa `hoy`, no `r.data.fecha`) y responde con
+    // `NextResponse.json({ ...r.data, fecha: hoy })` (sobreescribe explícitamente
+    // cualquier `r.data.fecha` con `hoy`). La ruta ya está correcta — no hizo
+    // falta ningún cambio. Si alguien vuelve a usar `r.data.fecha` como clave
+    // de guardado o en el cuerpo de la respuesta, esta nota deja de ser
+    // cierta y hay que corregir la ruta.
+  });
+});
