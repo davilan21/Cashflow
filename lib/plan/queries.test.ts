@@ -37,12 +37,13 @@ describe("listarRubros", () => {
 describe("guardarAjuste", () => {
   it("hace upsert sobre (cuenta_id, mes, rubro_id) y devuelve la fila", async () => {
     const fila = { id: "a1", cuenta_id: "c1", mes: "2026-10", rubro_id: null, monto: 4_000_000, updated_at: "" };
-    const { supabase, peticiones } = clienteQueCaptura([fila]);
+    const { supabase, peticiones } = clienteQueCaptura(fila);
     const { data, error } = await guardarAjuste(supabase, "c1", "2026-10", null, 4_000_000);
 
     expect(peticiones[0].metodo).toBe("POST");
     expect(peticiones[0].url).toContain("on_conflict=cuenta_id,mes,rubro_id");
     expect(peticiones[0].headers.get("Prefer")).toContain("resolution=merge-duplicates");
+    expect(peticiones[0].headers.get("Accept")).toBe("application/vnd.pgrst.object+json");
     expect(JSON.parse(peticiones[0].cuerpo!)).toMatchObject({ cuenta_id: "c1", mes: "2026-10", rubro_id: null, monto: 4_000_000 });
     expect(error).toBeNull();
     expect(data).toEqual(fila);

@@ -19,17 +19,12 @@ export async function listarRubros(supabase: Cliente): Promise<Resultado<PlanRub
 }
 
 export async function crearRubro(supabase: Cliente, cuentaId: string, datos: NuevoRubro): Promise<Resultado<PlanRubro>> {
-  const result = await sinTipar(supabase)
+  const { data, error } = await sinTipar(supabase)
     .from("plan_rubros")
     .insert({ ...datos, cuenta_id: cuentaId })
     .select()
     .single();
-
-  const finalData = Array.isArray(result.data) && result.data.length > 0
-    ? result.data[0]
-    : result.data;
-
-  return { data: finalData as PlanRubro | null, error: result.error };
+  return { data: data as PlanRubro | null, error };
 }
 
 export async function actualizarRubro(
@@ -37,13 +32,8 @@ export async function actualizarRubro(
   id: string,
   cambios: Partial<NuevoRubro>
 ): Promise<Resultado<PlanRubro>> {
-  const result = await sinTipar(supabase).from("plan_rubros").update(cambios).eq("id", id).select().single();
-
-  const finalData = Array.isArray(result.data) && result.data.length > 0
-    ? result.data[0]
-    : result.data;
-
-  return { data: finalData as PlanRubro | null, error: result.error };
+  const { data, error } = await sinTipar(supabase).from("plan_rubros").update(cambios).eq("id", id).select().single();
+  return { data: data as PlanRubro | null, error };
 }
 
 export async function eliminarRubro(supabase: Cliente, id: string): Promise<{ error: PostgrestError | null }> {
@@ -64,18 +54,12 @@ export async function guardarAjuste(
   rubroId: string | null,
   monto: number
 ): Promise<Resultado<PlanAjuste>> {
-  const result = await sinTipar(supabase)
+  const { data, error } = await sinTipar(supabase)
     .from("plan_ajustes")
     .upsert({ cuenta_id: cuentaId, mes, rubro_id: rubroId, monto }, { onConflict: "cuenta_id,mes,rubro_id" })
     .select()
     .single();
-
-  // `.single()` should unpack arrays, but with mocked fetch may need explicit handling
-  const finalData = Array.isArray(result.data) && result.data.length > 0
-    ? result.data[0]
-    : result.data;
-
-  return { data: finalData as PlanAjuste | null, error: result.error };
+  return { data: data as PlanAjuste | null, error };
 }
 
 /** Quitar el ajuste = volver al default (rubro) o al ritmo/promedio (TC). */
