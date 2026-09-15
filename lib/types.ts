@@ -123,6 +123,81 @@ export interface PlanAjuste {
   updated_at: string;
 }
 
+export type TipoInstrumento = "cdt" | "acciones" | "fondo" | "cuenta" | "otro";
+export type Moneda = "COP" | "USD";
+export type TipoMovimiento = "aporte" | "retiro";
+export type FuenteTrm = "datos.gov.co" | "manual";
+
+/** Un ahorro: CDT, acciones, fondo, cuenta de ahorros u otro. */
+export interface AhorroInstrumento {
+  id: string;
+  cuenta_id: string;
+  nombre: string;
+  tipo: TipoInstrumento;
+  moneda: Moneda;
+  titular: string | null; // user_id del miembro; null = del hogar
+  entidad: string | null;
+  tasa_ea: number | null; // % efectivo anual, solo CDT
+  vencimiento: string | null; // 'YYYY-MM-DD', solo CDT
+  activo: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NuevoInstrumento {
+  nombre: string;
+  tipo: TipoInstrumento;
+  moneda: Moneda;
+  titular: string | null;
+  entidad: string | null;
+  tasa_ea: number | null;
+  vencimiento: string | null;
+  activo?: boolean;
+}
+
+/** Aporte o retiro. El signo lo da `tipo`; `monto` siempre positivo, en la moneda del instrumento. */
+export interface AhorroMovimiento {
+  id: string;
+  cuenta_id: string;
+  instrumento_id: string;
+  fecha: string;
+  tipo: TipoMovimiento;
+  monto: number;
+  nota: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface NuevoMovimiento {
+  instrumento_id: string;
+  fecha: string;
+  tipo: TipoMovimiento;
+  monto: number;
+  nota: string | null;
+}
+
+/** "El día `fecha` este instrumento valía `valor`", en su moneda. */
+export interface AhorroValoracion {
+  id: string;
+  cuenta_id: string;
+  instrumento_id: string;
+  fecha: string;
+  valor: number;
+  nota: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** TRM (pesos por dólar) de una fecha, por cuenta. */
+export interface Trm {
+  cuenta_id: string;
+  fecha: string;
+  valor: number;
+  fuente: FuenteTrm;
+  created_at: string;
+}
+
 /**
  * Nota: Insert/Update van como literales de objeto inline (no como referencia
  * a un `interface` aparte). Con @supabase/postgrest-js 2.x, cuando Insert/Update
@@ -312,6 +387,73 @@ export interface Database {
           monto?: number;
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      ahorro_instrumentos: {
+        Row: AhorroInstrumento;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          nombre: string;
+          tipo: string;
+          moneda: string;
+          titular?: string | null;
+          entidad?: string | null;
+          tasa_ea?: number | null;
+          vencimiento?: string | null;
+          activo?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          nombre?: string;
+          tipo?: string;
+          moneda?: string;
+          titular?: string | null;
+          entidad?: string | null;
+          tasa_ea?: number | null;
+          vencimiento?: string | null;
+          activo?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      ahorro_movimientos: {
+        Row: AhorroMovimiento;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          instrumento_id: string;
+          fecha: string;
+          tipo: string;
+          monto: number;
+          nota?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: { fecha?: string; tipo?: string; monto?: number; nota?: string | null };
+        Relationships: [];
+      };
+      ahorro_valoraciones: {
+        Row: AhorroValoracion;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          instrumento_id: string;
+          fecha: string;
+          valor: number;
+          nota?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: { valor?: number; nota?: string | null };
+        Relationships: [];
+      };
+      ahorro_trm: {
+        Row: Trm;
+        Insert: { cuenta_id: string; fecha: string; valor: number; fuente: string; created_at?: string };
+        Update: { valor?: number; fuente?: string };
         Relationships: [];
       };
     };
