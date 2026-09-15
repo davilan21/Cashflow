@@ -108,6 +108,7 @@ export function AhorrosClient({
     setMovimientos((prev) => prev.filter((m) => m.instrumento_id !== id));
     setValoraciones((prev) => prev.filter((v) => v.instrumento_id !== id));
     setSeleccionado(null);
+    if (id.startsWith("tmp-")) return;
     const { error } = await eliminarInstrumento(supabase, id);
     if (error) {
       setInstrumentos((prev) => (prev.some((i) => i.id === id) ? prev : [...prev, instrumentoBorrado]));

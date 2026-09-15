@@ -64,6 +64,7 @@ export function DetalleInstrumentoSheet({
   const { instrumento: i } = resumen;
   const fmt = i.moneda === "USD" ? dolares : pesos;
   const [confirmandoBorrarInst, setConfirmandoBorrarInst] = useState(false);
+  const esProvisional = resumen.instrumento.id.startsWith("tmp-");
 
   return (
     <Sheet titulo={i.nombre} onClose={onCerrar}>
@@ -74,11 +75,12 @@ export function DetalleInstrumentoSheet({
       </div>
       <div className="text-[26px] font-semibold num text-ink mt-2">{fmt(resumen.valor)}</div>
       <div className="text-[13px] text-muted num">aportado {fmt(resumen.aportado)}</div>
+      {esProvisional && <div className="text-[12px] text-muted mt-1">Guardando…</div>}
 
       <div className="flex gap-2 mt-4">
-        <Button onClick={onAportar}>Aportar</Button>
-        <Button onClick={onRetirar}>Retirar</Button>
-        <Button onClick={onActualizarValor}>Valorar</Button>
+        <Button onClick={onAportar} disabled={esProvisional}>Aportar</Button>
+        <Button onClick={onRetirar} disabled={esProvisional}>Retirar</Button>
+        <Button onClick={onActualizarValor} disabled={esProvisional}>Valorar</Button>
       </div>
 
       <div className="mt-4">
@@ -103,7 +105,7 @@ export function DetalleInstrumentoSheet({
       </div>
 
       <div className="flex flex-col gap-2 mt-5 pt-4 border-t border-line">
-        <Button onClick={onEditar}>
+        <Button onClick={onEditar} disabled={esProvisional}>
           <span className="inline-flex items-center gap-1.5 justify-center">
             <IconoLapiz className="w-4 h-4" /> Editar
           </span>

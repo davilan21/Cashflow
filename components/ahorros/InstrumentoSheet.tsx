@@ -78,7 +78,7 @@ export function InstrumentoSheet({
             role="radio"
             aria-checked={tipo === t}
             onClick={() => setTipo(t)}
-            className={`min-h-[40px] px-3 rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
+            className={`min-h-[44px] px-3 rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
               tipo === t ? "border-ink bg-ink text-white font-medium" : "border-line bg-surface text-muted"
             }`}
           >
@@ -96,7 +96,7 @@ export function InstrumentoSheet({
             role="radio"
             aria-checked={moneda === m}
             onClick={() => setMoneda(m)}
-            className={`flex-1 min-h-[40px] rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
+            className={`flex-1 min-h-[44px] rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
               moneda === m ? "border-ink bg-ink text-white font-medium" : "border-line bg-surface text-muted"
             }`}
           >
@@ -116,7 +116,7 @@ export function InstrumentoSheet({
                 role="radio"
                 aria-checked={titular === o.id}
                 onClick={() => setTitular(o.id)}
-                className={`min-h-[40px] px-3 rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
+                className={`min-h-[44px] px-3 rounded-xl border text-[13px] cursor-pointer transition-colors duration-200 ${
                   titular === o.id ? "border-ink bg-ink text-white font-medium" : "border-line bg-surface text-muted"
                 }`}
               >
