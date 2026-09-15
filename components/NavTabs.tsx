@@ -7,6 +7,7 @@ const TABS = [
   { href: "/registro", label: "Registro" },
   { href: "/pendientes", label: "Pendientes" },
   { href: "/historial", label: "Historial" },
+  { href: "/plan", label: "Plan" },
   { href: "/cuenta", label: "Cuenta" },
 ] as const;
 
