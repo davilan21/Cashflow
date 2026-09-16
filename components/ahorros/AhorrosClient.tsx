@@ -136,6 +136,10 @@ export function AhorrosClient({
       return;
     }
     setInstrumentos((prev) => prev.map((i) => (i.id === idTmp ? data : i)));
+    // Recién creado: abrimos "Valorar" directo para que registre cuánto tiene
+    // ahorrado ahí ahora — si no, el ahorro queda en $0 sin que nada lo lleve
+    // a ponerle valor.
+    setHojaValoracion(data);
   };
 
   const borrarInstrumento = async () => {
