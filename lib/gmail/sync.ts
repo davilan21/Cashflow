@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, GmailConexion, Miembro } from "@/lib/types";
 import { sinTipar } from "@/lib/supabase/queries";
 import { refrescarToken } from "./oauth";
-import { listarIdsMensajes, obtenerMensaje } from "./gmailApi";
+import { ErrorGmail, listarIdsMensajes, obtenerMensaje } from "./gmailApi";
 import { extraerTextoPlano, parsearNotificacionConClaude, parsearNotificacionLocal } from "./parse";
 
 // Bancolombia manda notificaciones de tarjeta desde al menos estos dos
@@ -94,6 +94,16 @@ export async function sincronizarGmail(
 
     return { nuevos };
   } catch (e) {
+    // Un 403 por falta de permiso (se desmarcó la casilla de Gmail al dar
+    // consentimiento) no se arregla reintentando: se marca expirado para que
+    // la UI pida reconectar.
+    if (e instanceof ErrorGmail && e.faltaPermiso) {
+      await sinTipar(admin)
+        .from("gmail_conexiones")
+        .update({ estado: "expirado", ultimo_error: "Falta el permiso para leer Gmail, reconecta y marca la casilla de Gmail" })
+        .eq("user_id", userId);
+      return { error: "expirado" };
+    }
     await sinTipar(admin)
       .from("gmail_conexiones")
       .update({ estado: "error", ultimo_error: e instanceof Error ? e.message : "Error desconocido" })

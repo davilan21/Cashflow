@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { listarIdsMensajes, obtenerMensaje } from "./gmailApi";
+import { ErrorGmail, listarIdsMensajes, obtenerMensaje } from "./gmailApi";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -24,8 +24,36 @@ describe("listarIdsMensajes", () => {
   });
 
   it("lanza error si Gmail responde con fallo", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }));
-    await expect(listarIdsMensajes("token", "q")).rejects.toThrow();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => { throw new Error("no json"); } }));
+    await expect(listarIdsMensajes("token", "q")).rejects.toThrow("Gmail list falló: 401");
+  });
+
+  it("incluye el motivo de Google en un 403 y detecta falta de permiso", async () => {
+    const cuerpo = {
+      error: {
+        code: 403,
+        message: "Request had insufficient authentication scopes.",
+        status: "PERMISSION_DENIED",
+        details: [{ reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => cuerpo }));
+
+    const error = await listarIdsMensajes("token", "q").catch((e) => e);
+
+    expect(error).toBeInstanceOf(ErrorGmail);
+    expect(error.message).toContain("403 (ACCESS_TOKEN_SCOPE_INSUFFICIENT");
+    expect(error.faltaPermiso).toBe(true);
+  });
+
+  it("un 403 de cuota no se trata como falta de permiso", async () => {
+    const cuerpo = { error: { code: 403, message: "Rate limit exceeded", errors: [{ reason: "userRateLimitExceeded" }] } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => cuerpo }));
+
+    const error = await listarIdsMensajes("token", "q").catch((e) => e);
+
+    expect(error.message).toContain("userRateLimitExceeded");
+    expect(error.faltaPermiso).toBe(false);
   });
 });
 

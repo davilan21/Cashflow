@@ -21,7 +21,9 @@ export async function GET(request: Request) {
   // sinTipar: la inferencia genérica de .select() colapsa a `never` con este
   // Database multi-tabla (mismo problema documentado en lib/supabase/queries.ts
   // para .insert()/.update()); se castea la fila al tipo conocido en su lugar.
-  const { data } = await sinTipar(admin).from("gmail_conexiones").select("user_id").eq("estado", "activo");
+  // "error" también se reintenta: un fallo transitorio (cuota, 5xx de Google)
+  // no debe apagar el cron para siempre. Solo "expirado" espera reconexión.
+  const { data } = await sinTipar(admin).from("gmail_conexiones").select("user_id").in("estado", ["activo", "error"]);
   const conexiones = data as Pick<GmailConexion, "user_id">[] | null;
 
   const resultados = await Promise.all((conexiones ?? []).map((c) => sincronizarGmail(admin, c.user_id)));
