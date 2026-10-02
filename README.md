@@ -1,7 +1,7 @@
 # Cashflow
 
 Control personal del gasto de tarjeta de crédito, organizado por **ciclo de
-facturación** (16 de un mes al 15 del siguiente, se paga el 30) en vez de por
+facturación** (16 de un mes al 15 del siguiente, se paga el 2 del mes posterior) en vez de por
 mes calendario. Registro en lenguaje natural ("hoy 200k en almuerzo y 15 en
 bus"), topes con proyección, historial por ciclo y exportación/importación.
 

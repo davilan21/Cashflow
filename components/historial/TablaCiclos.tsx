@@ -1,4 +1,4 @@
-import { etiquetaCiclo, etiquetaPago } from "@/lib/labels";
+import { etiquetaCiclo, textoEstadoCiclo } from "@/lib/labels";
 import { pesos, pesosCorto } from "@/lib/money";
 import type { ResumenCiclo } from "@/lib/historial";
 import type { Category } from "@/lib/types";
@@ -27,7 +27,7 @@ export function TablaCiclos({
             <span className="flex-1 min-w-0">
               <span className="block text-sm">{etiquetaCiclo(r.ciclo)}</span>
               <span className="block text-[11px] text-muted mt-0.5">
-                {r.enCurso ? "en curso" : `pagado el ${etiquetaPago(r.ciclo)}`}
+                {textoEstadoCiclo(r.ciclo, r.enCurso)}
                 {r.topCategoria ? ` · más en ${catById(r.topCategoria).nombre.toLowerCase()}` : ""}
               </span>
             </span>

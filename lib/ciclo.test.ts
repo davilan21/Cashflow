@@ -62,20 +62,12 @@ describe("cicloFin", () => {
 });
 
 describe("cicloPago", () => {
-  it("se paga el 30 en meses de 31 días", () => {
-    expect(cicloPago("2026-08")).toBe("2026-08-30");
+  it("se paga el 2 del mes siguiente al cierre", () => {
+    expect(cicloPago("2026-09")).toBe("2026-10-02");
   });
 
-  it("se paga el 30 en meses de 30 días", () => {
-    expect(cicloPago("2026-04")).toBe("2026-04-30");
-  });
-
-  it("en febrero se paga el último día del mes (28)", () => {
-    expect(cicloPago("2026-02")).toBe("2026-02-28");
-  });
-
-  it("en febrero bisiesto se paga el 29", () => {
-    expect(cicloPago("2028-02")).toBe("2028-02-29");
+  it("cruza el año: el ciclo de diciembre se paga el 2 de enero", () => {
+    expect(cicloPago("2026-12")).toBe("2027-01-02");
   });
 });
 

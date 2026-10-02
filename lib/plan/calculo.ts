@@ -53,7 +53,6 @@ export interface TCPlan {
   origenReferencia: Exclude<OrigenTC, "manual">;
 }
 
-/** El ciclo del mes M es M: cierra el 15 de M y se paga el 30 de M. */
 export function estadoCiclo(ciclo: string, hoy: string): EstadoCiclo {
   if (hoy > cicloFin(ciclo)) return "cerrado";
   if (hoy < cicloInicio(ciclo)) return "no_iniciado";
@@ -83,8 +82,17 @@ export function promedioCiclosCerrados(gastos: Expense[], hoy: string, n = 3): n
   return Math.round(totales.reduce((s, t) => s + t, 0) / totales.length);
 }
 
+/**
+ * La factura que sale de la caja en el mes M es la del ciclo M−1: cierra el 15
+ * de M−1 y se paga el 2 de M (`cicloPago`; p. ej. el ciclo 16-ago..15-sep se paga
+ * el 2-oct). Los ajustes manuales de TC se guardan por mes de pago, no por ciclo.
+ */
+export function cicloQuePagaEn(mes: string): string {
+  return desplazarMes(mes, -1);
+}
+
 export function calcularTC(gastos: Expense[], ajustes: PlanAjuste[], mes: string, hoy: string): TCPlan {
-  const ciclo = mes;
+  const ciclo = cicloQuePagaEn(mes);
   const estado = estadoCiclo(ciclo, hoy);
   const real = totalCiclo(gastos, ciclo);
 
