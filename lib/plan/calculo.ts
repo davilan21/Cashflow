@@ -84,8 +84,8 @@ export function promedioCiclosCerrados(gastos: Expense[], hoy: string, n = 3): n
 
 /**
  * La factura que sale de la caja en el mes M es la del ciclo M−1: cierra el 15
- * de M−1 y se paga a comienzos de M (p. ej. el ciclo 16-ago..15-sep se paga el
- * 2-oct). Los ajustes manuales de TC se guardan por mes de pago, no por ciclo.
+ * de M−1 y se paga el 2 de M (`cicloPago`; p. ej. el ciclo 16-ago..15-sep se paga
+ * el 2-oct). Los ajustes manuales de TC se guardan por mes de pago, no por ciclo.
  */
 export function cicloQuePagaEn(mes: string): string {
   return desplazarMes(mes, -1);

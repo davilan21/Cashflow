@@ -14,7 +14,7 @@ export function etiquetaCiclo(ciclo: string): string {
 
 export function etiquetaPago(ciclo: string): string {
   const pago = cicloPago(ciclo);
-  return `${diaDe(pago)} de ${MESES[mesNum(ciclo) - 1]}`;
+  return `${diaDe(pago)} de ${MESES[mesNum(pago) - 1]}`;
 }
 
 export function etiquetaCorta(ciclo: string): string {

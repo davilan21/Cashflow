@@ -1,8 +1,7 @@
 /**
  * El ciclo de la tarjeta va del 16 de un mes al 15 del siguiente y se paga
- * el día 30 del mes en que cierra (o el último día del mes si tiene menos
- * de 30). El ciclo se identifica por ese mes de cierre/pago: '2026-08'
- * significa 16 jul – 15 ago, se paga el 30 de agosto.
+ * el día 2 del mes posterior al cierre. El ciclo se identifica por su mes de
+ * cierre: '2026-08' significa 16 jul – 15 ago, se paga el 2 de septiembre.
  *
  * Todas las fechas son strings 'YYYY-MM-DD' y toda la aritmética de mes
  * usa enteros (año*12 + mes) en vez de Date, para no depender de la zona
@@ -70,9 +69,9 @@ export function cicloFin(ciclo: string): string {
   return `${ciclo}-15`;
 }
 
-/** Fecha de pago: el 30 del mes de cierre, o el último día si el mes tiene menos de 30. */
+/** Fecha de pago: el 2 del mes siguiente al de cierre. */
 export function cicloPago(ciclo: string): string {
-  return `${ciclo}-${pad(Math.min(30, diasEnMes(ciclo)))}`;
+  return `${desplazarMes(ciclo, 1)}-02`;
 }
 
 /** Mitad del ciclo a la que pertenece una fecha: 1 = 16 al fin de mes, 2 = 1 al 15. */
