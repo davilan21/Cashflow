@@ -17,6 +17,12 @@ export function etiquetaPago(ciclo: string): string {
   return `${diaDe(pago)} de ${MESES[mesNum(pago) - 1]}`;
 }
 
+/** Lo que dice Historial bajo cada ciclo: en curso, por pagar (cerrado, antes del día de pago) o pagado. */
+export function textoEstadoCiclo(ciclo: string, enCurso: boolean, hoy: string = hoyISO()): string {
+  if (enCurso) return "en curso";
+  return `${hoy < cicloPago(ciclo) ? "por pagar" : "pagado"} el ${etiquetaPago(ciclo)}`;
+}
+
 export function etiquetaCorta(ciclo: string): string {
   return `${CORTOS[mesNum(ciclo) - 1]} ${ciclo.slice(2, 4)}`;
 }
