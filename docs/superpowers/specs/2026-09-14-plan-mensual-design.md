@@ -47,7 +47,7 @@ que se modifica: `components/NavTabs.tsx` (una entrada en `TABS`) y
 
 | Pregunta | Decisión |
 |---|---|
-| Unidad de tiempo | **Mes calendario** para ingresos y fijos; la tarjeta del mes M es **el ciclo M** (16 de M−1 → 15 de M, se paga el 30 de M). Híbrido: "lo que entra en septiembre paga la factura de septiembre". |
+| Unidad de tiempo | **Mes calendario** para ingresos y fijos; la tarjeta del mes M es **el ciclo M−1** (16 de M−2 → 15 de M−1), que se paga a comienzos de M. Corregido el 2026-10-02: el diseño original asumía pago el 30 de M, pero el ciclo que cierra el 15-sep se paga el 2-oct. |
 | Qué se resta | Tarjeta **+ gastos fijos fuera de TC** (arriendo, servicios…). Solo TC daría un ahorro inflado. |
 | Cómo se registran ingresos y fijos | **Rubros recurrentes con monto por defecto**, sobreescribibles mes a mes. Un extra puntual (prima) es un rubro de un solo mes. |
 | TC de meses futuros | **Promedio de los últimos 3 ciclos cerrados con gasto > 0, editable por mes.** |
@@ -105,6 +105,14 @@ Un rubro aplica al mes si `desde <= mes && (hasta == null || mes <= hasta)`
 `(rubro_id, mes)` si existe; si no, `monto_default`.
 
 ### Tarjeta: depende del estado del ciclo, no del mes
+
+> **Corregido el 2026-10-02.** El mes M paga el ciclo **M−1**
+> (`cicloQuePagaEn(M)`), no el ciclo M: la factura que cierra el 15 de M−1 sale
+> de la caja a comienzos de M. La tabla de abajo sigue hablando del "ciclo";
+> leé "ciclo M" como "el ciclo que paga el mes", es decir M−1. Consecuencia: el
+> mes actual siempre tiene factura exacta, el siguiente va "a este ritmo" y del
+> tercero en adelante, promedio. Los ajustes manuales de TC se guardan por mes
+> de pago.
 
 El ciclo del mes M es `M` mismo (`cicloDe` ya define que las fechas 16 de
 M−1 a 15 de M pertenecen al ciclo `M`).
