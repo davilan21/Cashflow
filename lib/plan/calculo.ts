@@ -1,13 +1,17 @@
 import { cicloDe, cicloFin, cicloInicio, desplazarMes, diasCorridosEnRango, diasEntre, mesDe } from "@/lib/ciclo";
-import type { Expense, PlanAjuste, PlanRubro, TipoRubro } from "@/lib/types";
+import type { Expense, PlanAjuste, PlanPago, PlanRubro, TipoRubro } from "@/lib/types";
 import type { OrigenTC } from "./etiquetas";
 
 export interface LineaPlan {
   rubroId: string;
   nombre: string;
+  /** Lo que cuenta en el Plan: el pago si existe; si no, el estimado. */
   monto: number;
   montoDefault: number;
   ajustado: boolean;
+  /** Ajuste del mes o default: lo que habría sin el pago. */
+  estimado: number;
+  pagado: { monto: number; pagadoEl: string } | null;
 }
 
 /** Los meses 'YYYY-MM' desde `atras` antes del mes de `hoy` hasta `adelante` después, ordenados. */
@@ -23,19 +27,23 @@ export function rubroAplica(r: PlanRubro, mes: string): boolean {
   return r.desde <= mes && (r.hasta === null || mes <= r.hasta);
 }
 
-/** Las líneas de un tipo vigentes en un mes, con el ajuste del mes aplicado si existe. */
-export function lineasDe(rubros: PlanRubro[], ajustes: PlanAjuste[], mes: string, tipo: TipoRubro): LineaPlan[] {
+/** Las líneas de un tipo vigentes en un mes. Monto: pago → ajuste → default. Los pagos solo cuentan para fijos. */
+export function lineasDe(rubros: PlanRubro[], ajustes: PlanAjuste[], mes: string, tipo: TipoRubro, pagos: PlanPago[] = []): LineaPlan[] {
   return rubros
     .filter((r) => r.tipo === tipo && rubroAplica(r, mes))
     .sort((a, b) => a.orden - b.orden || a.created_at.localeCompare(b.created_at))
     .map((r) => {
       const aj = ajustes.find((a) => a.mes === mes && a.rubro_id === r.id);
+      const p = tipo === "fijo" ? pagos.find((x) => x.mes === mes && x.rubro_id === r.id) : undefined;
+      const estimado = aj ? aj.monto : r.monto_default;
       return {
         rubroId: r.id,
         nombre: r.nombre,
-        monto: aj ? aj.monto : r.monto_default,
+        monto: p ? p.monto : estimado,
         montoDefault: r.monto_default,
         ajustado: Boolean(aj),
+        estimado,
+        pagado: p ? { monto: p.monto, pagadoEl: p.pagado_el } : null,
       };
     });
 }
@@ -145,14 +153,15 @@ export function calcularPlan(opts: {
   hoy: string;
   mesesAtras?: number;
   mesesAdelante?: number;
+  pagos?: PlanPago[];
 }): MesPlan[] {
-  const { rubros, ajustes, gastos, hoy, mesesAtras = 3, mesesAdelante = 6 } = opts;
+  const { rubros, ajustes, gastos, hoy, mesesAtras = 3, mesesAdelante = 6, pagos = [] } = opts;
   const mesActual = mesDe(hoy);
   let acumulado: number | null = null;
 
   return rangoMeses(hoy, mesesAtras, mesesAdelante).map((mes) => {
-    const ingresos = lineasDe(rubros, ajustes, mes, "ingreso");
-    const fijos = lineasDe(rubros, ajustes, mes, "fijo");
+    const ingresos = lineasDe(rubros, ajustes, mes, "ingreso", pagos);
+    const fijos = lineasDe(rubros, ajustes, mes, "fijo", pagos);
     const totalIngresos = suma(ingresos);
     const totalFijos = suma(fijos);
     const tc = calcularTC(gastos, ajustes, mes, hoy);
