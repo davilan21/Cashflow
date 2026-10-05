@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +37,12 @@ export function PagosClient({
   const { mensaje, accion, mostrar } = useToast();
   const { encolar, nuevaGeneracion } = useColaPorClave();
   const [pagos, setPagos] = useState(pagosIniciales);
+  // Espejo síncrono de `pagos`: los "Deshacer" capturan closures viejas y deben leer la fila ACTUAL.
+  const pagosRef = useRef(pagosIniciales);
+  const aplicarPagos = (f: (prev: PlanPago[]) => PlanPago[]) => {
+    pagosRef.current = f(pagosRef.current);
+    setPagos(pagosRef.current);
+  };
   const [abierto, setAbierto] = useState<ItemPago | null>(null);
   const [verPagados, setVerPagados] = useState(false);
   const hoy = hoyISO();
@@ -53,15 +59,15 @@ export function PagosClient({
   const escribir = (rubroId: string, mes: string, nuevo: PlanPago | null, previo: PlanPago | undefined, tarea: () => Promise<{ fila?: PlanPago | null; error: unknown }>, textoError: string) => {
     const k = clave(rubroId, mes);
     const esUltima = nuevaGeneracion(k);
-    setPagos((prev) => [...prev.filter((p) => !mismo(p, rubroId, mes)), ...(nuevo ? [nuevo] : [])]);
+    aplicarPagos((prev) => [...prev.filter((p) => !mismo(p, rubroId, mes)), ...(nuevo ? [nuevo] : [])]);
     encolar(k, async () => {
       const { fila, error } = await tarea();
       if (error) {
-        if (esUltima()) setPagos((prev) => [...prev.filter((p) => !mismo(p, rubroId, mes)), ...(previo ? [previo] : [])]);
+        if (esUltima()) aplicarPagos((prev) => [...prev.filter((p) => !mismo(p, rubroId, mes)), ...(previo ? [previo] : [])]);
         mostrar(textoError);
         return;
       }
-      if (fila && esUltima()) setPagos((prev) => prev.map((p) => (mismo(p, rubroId, mes) ? fila : p)));
+      if (fila && esUltima()) aplicarPagos((prev) => prev.map((p) => (mismo(p, rubroId, mes) ? fila : p)));
       router.refresh(); // actualiza el contador de la pestaña (layout de servidor)
     }).catch((e: unknown) => {
       console.error("pagos: falló la cola", e);
@@ -70,7 +76,7 @@ export function PagosClient({
   };
 
   const marcar = (item: ItemPago, monto: number, pagadoEl: string) => {
-    const previo = pagos.find((p) => mismo(p, item.rubroId, item.mes));
+    const previo = pagosRef.current.find((p) => mismo(p, item.rubroId, item.mes));
     const provisional: PlanPago = previo
       ? { ...previo, monto, pagado_el: pagadoEl }
       : { id: `tmp-${clave(item.rubroId, item.mes)}`, cuenta_id: cuentaId, rubro_id: item.rubroId, mes: item.mes, monto, pagado_el: pagadoEl, created_by: null, created_at: "", updated_at: "" };
@@ -82,7 +88,7 @@ export function PagosClient({
   };
 
   const desmarcar = (item: ItemPago) => {
-    const previo = pagos.find((p) => mismo(p, item.rubroId, item.mes));
+    const previo = pagosRef.current.find((p) => mismo(p, item.rubroId, item.mes));
     escribir(item.rubroId, item.mes, null, previo, async () => {
       const { error } = await desmarcarPago(supabase, cuentaId, item.rubroId, item.mes);
       return { error };
@@ -99,10 +105,10 @@ export function PagosClient({
   const check = (item: ItemPago) => {
     if (item.pago) {
       const previo = desmarcar(item);
-      mostrar(`${item.nombre} desmarcado`, { etiqueta: "Deshacer", onClick: () => restaurar(item, previo) });
+      mostrar(`${item.nombre} desmarcado`, { etiqueta: "Deshacer", onClick: () => { mostrar(""); restaurar(item, previo); } });
     } else {
       const previo = marcar(item, item.montoSugerido, hoy);
-      mostrar(`${item.nombre} pagado`, { etiqueta: "Deshacer", onClick: () => restaurar(item, previo) });
+      mostrar(`${item.nombre} pagado`, { etiqueta: "Deshacer", onClick: () => { mostrar(""); restaurar(item, previo); } });
     }
   };
 
@@ -164,7 +170,7 @@ export function PagosClient({
           onDesmarcar={() => {
             const previo = desmarcar(abierto);
             const item = abierto;
-            mostrar(`${item.nombre} desmarcado`, { etiqueta: "Deshacer", onClick: () => restaurar(item, previo) });
+            mostrar(`${item.nombre} desmarcado`, { etiqueta: "Deshacer", onClick: () => { mostrar(""); restaurar(item, previo); } });
             setAbierto(null);
           }}
           onCerrar={() => setAbierto(null)}
