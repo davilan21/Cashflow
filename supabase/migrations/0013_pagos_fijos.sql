@@ -35,10 +35,10 @@ create index plan_pagos_rubro_idx on plan_pagos (rubro_id);
 create or replace function plan_pagos_solo_fijos()
 returns trigger
 language plpgsql
-set search_path = public
+set search_path = public, pg_temp
 as $$
 begin
-  if not exists (select 1 from plan_rubros where id = new.rubro_id and tipo = 'fijo') then
+  if not exists (select 1 from public.plan_rubros where id = new.rubro_id and tipo = 'fijo') then
     raise exception 'plan_pagos: el rubro % no es un gasto fijo', new.rubro_id using errcode = '23514';
   end if;
   return new;
@@ -53,6 +53,26 @@ create trigger plan_pagos_set_created_by
   before insert on plan_pagos
   for each row execute function set_created_by();
 
+-- created_by lo fija el insert; un update no puede reasignarlo a otro usuario.
+-- Pasar a null sí se deja: es lo que hace el `on delete set null` de la FK
+-- (un UPDATE que dispara este trigger) al borrar el usuario de auth.users.
+create or replace function plan_pagos_conservar_created_by()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.created_by is not null then
+    new.created_by := old.created_by;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger plan_pagos_conservar_created_by
+  before update on plan_pagos
+  for each row execute function plan_pagos_conservar_created_by();
+
 create trigger plan_pagos_set_updated_at
   before update on plan_pagos
   for each row execute function set_updated_at();
@@ -62,3 +82,8 @@ alter table plan_pagos enable row level security;
 
 create policy "plan_pagos_rw" on plan_pagos
   for all using (cuenta_id = mi_cuenta()) with check (cuenta_id = mi_cuenta());
+
+-- 6. Grants explícitos: el default nuevo de Supabase ya no expone tablas nuevas
+-- (authenticated recibiría 42501) y el viejo le daba a anon todo, TRUNCATE incluido.
+revoke all on table plan_pagos from anon, authenticated;
+grant select, insert, update, delete on table plan_pagos to authenticated;
