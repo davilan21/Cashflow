@@ -7,6 +7,7 @@ import { IconoEngranaje } from "@/components/ui/Iconos";
 const TABS = [
   { href: "/registro", label: "Registro" },
   { href: "/pendientes", label: "Pendientes" },
+  { href: "/pagos", label: "Pagos" },
   { href: "/historial", label: "Historial" },
   { href: "/plan", label: "Plan" },
   { href: "/ahorros", label: "Ahorros" },
@@ -14,7 +15,7 @@ const TABS = [
   { href: "/cuenta", label: "Cuenta", soloEscritorio: true },
 ] as const;
 
-export function NavTabs({ pendientesCount = 0 }: { pendientesCount?: number }) {
+export function NavTabs({ pendientesCount = 0, pagosCount = 0 }: { pendientesCount?: number; pagosCount?: number }) {
   const pathname = usePathname();
   const enCuenta = pathname.startsWith("/cuenta");
 
@@ -36,6 +37,11 @@ export function NavTabs({ pendientesCount = 0 }: { pendientesCount?: number }) {
               {t.href === "/pendientes" && pendientesCount > 0 && (
                 <span className="ml-1 inline-block bg-alerta text-white text-[10px] rounded-full px-1.5 leading-4 align-middle">
                   {pendientesCount}
+                </span>
+              )}
+              {t.href === "/pagos" && pagosCount > 0 && (
+                <span className="ml-1 inline-block bg-alerta text-white text-[10px] rounded-full px-1.5 leading-4 align-middle">
+                  {pagosCount}
                 </span>
               )}
             </Link>
