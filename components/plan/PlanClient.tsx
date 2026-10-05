@@ -7,7 +7,7 @@ import { hoyISO } from "@/lib/ciclo";
 import { calcularPlan } from "@/lib/plan/calculo";
 import { guardarAjuste, quitarAjuste, crearRubro, actualizarRubro, eliminarRubro } from "@/lib/plan/queries";
 import { etiquetaMes, etiquetaOrigenTC } from "@/lib/plan/etiquetas";
-import type { Expense, NuevoRubro, PlanAjuste, PlanRubro, TipoRubro } from "@/lib/types";
+import type { Expense, NuevoRubro, PlanAjuste, PlanPago, PlanRubro, TipoRubro } from "@/lib/types";
 import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
 import { SubTabs, type VistaPlan } from "./SubTabs";
@@ -25,12 +25,14 @@ export function PlanClient({
   rubrosIniciales,
   ajustesIniciales,
   gastos,
+  pagos,
   lecturaFallida,
 }: {
   cuentaId: string;
   rubrosIniciales: PlanRubro[];
   ajustesIniciales: PlanAjuste[];
   gastos: Expense[];
+  pagos: PlanPago[];
   lecturaFallida: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -42,7 +44,7 @@ export function PlanClient({
   const hoy = hoyISO();
   const [abierto, setAbierto] = useState<string | null>(hoy.slice(0, 7));
 
-  const plan = useMemo(() => calcularPlan({ rubros, ajustes, gastos, hoy }), [rubros, ajustes, gastos, hoy]);
+  const plan = useMemo(() => calcularPlan({ rubros, ajustes, gastos, hoy, pagos }), [rubros, ajustes, gastos, hoy, pagos]);
   const actual = plan.find((m) => m.esActual) ?? plan[0];
   const ultimo = plan[plan.length - 1];
   const hayIngresos = rubros.some((r) => r.tipo === "ingreso");
