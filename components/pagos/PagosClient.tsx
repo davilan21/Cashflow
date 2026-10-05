@@ -152,7 +152,7 @@ export function PagosClient({
               </button>
               {verPagados &&
                 grupos.pagados.map((i) => (
-                  <FilaPago key={clave(i.rubroId, i.mes)} item={i} hoy={hoy} mostrarMes={false} onCheck={() => check(i)} onAbrir={() => setAbierto(i)} />
+                  <FilaPago key={clave(i.rubroId, i.mes)} item={i} hoy={hoy} mostrarMes={i.mes !== mesActual} onCheck={() => check(i)} onAbrir={() => setAbierto(i)} />
                 ))}
             </section>
           )}

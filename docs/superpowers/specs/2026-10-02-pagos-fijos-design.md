@@ -126,8 +126,10 @@ interface ItemPago {
   `pendiente`; sin `dia_pago` → `sin_dia` (nunca vencido).
 - Solo fijos vigentes en el mes (`rubroAplica`).
 - `itemsPagos(rubros, ajustes, pagos, hoy)` devuelve el **mes actual completo**
-  más los **no pagados del mes anterior**. Nada más atrás: si no, el primer día
-  aparecerían vencidos todos los meses previos a que existiera el módulo.
+  más el **mes anterior**: sus no pagados (vencidos) y sus pagados (van al grupo
+  Pagados, para poder corregirlos o desmarcarlos durante el mes siguiente). Nada
+  más atrás, y nunca un mes anterior a `MES_INICIO_PAGOS = "2026-10"` (primer mes
+  del módulo): si no, el primer día aparecerían vencidos los meses previos.
 - `contadorPagos(items)` = vencidos + vence_pronto (incluye mes anterior).
 
 ### Tests mínimos
@@ -135,8 +137,8 @@ interface ItemPago {
 Prioridad pago > ajuste > default; desmarcar devuelve el estimado; día 31 en
 noviembre vence el 30 y en febrero el 28/29; borde de vence_pronto (hoy y +3
 cuentan, +4 no); el día del vencimiento no es vencido; un vencido del mes
-anterior aparece y uno de hace dos meses no; un pagado del mes anterior no
-aparece; fijo fuera de vigencia no aparece; sin día nunca vencido; contador.
+anterior aparece y uno de hace dos meses no; un pagado del mes anterior
+aparece en Pagados; nada antes de `MES_INICIO_PAGOS`; fijo fuera de vigencia no aparece; sin día nunca vencido; contador.
 
 ## 3. Pantalla
 

@@ -51,14 +51,21 @@ function itemsDelMes(rubros: PlanRubro[], ajustes: PlanAjuste[], pagos: PlanPago
   });
 }
 
+/** Primer mes que sigue el módulo: antes de él no hay pagos registrados que mirar. */
+export const MES_INICIO_PAGOS = "2026-10";
+
 /**
- * El mes actual completo más lo que quedó sin pagar del mes anterior. Nada más
- * atrás: si no, aparecerían vencidos todos los meses previos a que existiera el módulo.
+ * El mes actual completo más el mes anterior: sus no pagados (vencidos) y sus
+ * pagados (para poder corregirlos o desmarcarlos durante el mes siguiente).
+ * Nada más atrás, y nunca antes de MES_INICIO_PAGOS: si no, aparecerían
+ * vencidos todos los meses previos a que existiera el módulo.
  */
 export function itemsPagos(rubros: PlanRubro[], ajustes: PlanAjuste[], pagos: PlanPago[], hoy: string): ItemPago[] {
   const mes = mesDe(hoy);
-  const anteriores = itemsDelMes(rubros, ajustes, pagos, desplazarMes(mes, -1), hoy, true).filter((i) => i.estado !== "pagado");
-  return [...anteriores, ...itemsDelMes(rubros, ajustes, pagos, mes, hoy, false)];
+  const anterior = desplazarMes(mes, -1);
+  const anteriores = anterior < MES_INICIO_PAGOS ? [] : itemsDelMes(rubros, ajustes, pagos, anterior, hoy, true);
+  const actuales = mes < MES_INICIO_PAGOS ? [] : itemsDelMes(rubros, ajustes, pagos, mes, hoy, false);
+  return [...anteriores, ...actuales];
 }
 
 export interface GruposPagos {
