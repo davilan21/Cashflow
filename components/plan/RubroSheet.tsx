@@ -62,7 +62,7 @@ export function RubroSheet({
       return null;
     }
     setError(null);
-    return { tipo, nombre: nombre.trim(), monto_default: n, desde, hasta: hastaFinal };
+    return { tipo, nombre: nombre.trim(), monto_default: n, desde, hasta: hastaFinal, dia_pago: inicial?.dia_pago ?? null };
   };
 
   const guardar = () => {

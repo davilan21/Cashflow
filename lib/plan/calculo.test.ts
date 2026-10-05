@@ -8,6 +8,7 @@ export function rubro(p: Partial<PlanRubro> & Pick<PlanRubro, "id" | "tipo" | "m
     cuenta_id: "c1",
     nombre: p.id,
     hasta: null,
+    dia_pago: null,
     orden: 0,
     created_by: null,
     created_at: "",
