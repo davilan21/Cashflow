@@ -2,16 +2,29 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+export interface AccionToast {
+  etiqueta: string;
+  onClick: () => void;
+}
+
 export function useToast() {
   const [mensaje, setMensaje] = useState("");
+  const [accion, setAccion] = useState<AccionToast | null>(null);
 
   useEffect(() => {
     if (!mensaje) return;
-    const t = setTimeout(() => setMensaje(""), 2200);
+    // Con acción dura más: tiene que dar tiempo a tocar "Deshacer".
+    const t = setTimeout(() => {
+      setMensaje("");
+      setAccion(null);
+    }, accion ? 5000 : 2200);
     return () => clearTimeout(t);
-  }, [mensaje]);
+  }, [mensaje, accion]);
 
-  const mostrar = useCallback((texto: string) => setMensaje(texto), []);
+  const mostrar = useCallback((texto: string, nuevaAccion?: AccionToast) => {
+    setMensaje(texto);
+    setAccion(nuevaAccion ?? null);
+  }, []);
 
-  return { mensaje, mostrar };
+  return { mensaje, accion, mostrar };
 }
