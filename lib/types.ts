@@ -98,6 +98,8 @@ export interface PlanRubro {
   monto_default: number;
   desde: string; // 'YYYY-MM'
   hasta: string | null; // 'YYYY-MM' o null = sin fin
+  /** Día del mes en que vence (1-31). Solo fijos; null = sin día. */
+  dia_pago: number | null;
   orden: number;
   created_by: string | null;
   created_at: string;
@@ -111,6 +113,7 @@ export interface NuevoRubro {
   monto_default: number;
   desde: string;
   hasta: string | null;
+  dia_pago: number | null;
 }
 
 /** Un monto sobreescrito para un mes. rubro_id null = el estimado de tarjeta. */
@@ -120,6 +123,19 @@ export interface PlanAjuste {
   mes: string; // 'YYYY-MM'
   rubro_id: string | null;
   monto: number;
+  updated_at: string;
+}
+
+/** El pago real de un fijo en un mes. `mes` es el mes al que corresponde, no el de `pagado_el`. */
+export interface PlanPago {
+  id: string;
+  cuenta_id: string;
+  rubro_id: string;
+  mes: string; // 'YYYY-MM'
+  monto: number;
+  pagado_el: string; // 'YYYY-MM-DD'
+  created_by: string | null;
+  created_at: string;
   updated_at: string;
 }
 
@@ -357,6 +373,7 @@ export interface Database {
           monto_default: number;
           desde: string;
           hasta?: string | null;
+          dia_pago?: number | null;
           orden?: number;
           created_by?: string | null;
           created_at?: string;
@@ -368,6 +385,7 @@ export interface Database {
           monto_default?: number;
           desde?: string;
           hasta?: string | null;
+          dia_pago?: number | null;
           orden?: number;
           updated_at?: string;
         };
@@ -385,6 +403,26 @@ export interface Database {
         };
         Update: {
           monto?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      plan_pagos: {
+        Row: PlanPago;
+        Insert: {
+          id?: string;
+          cuenta_id: string;
+          rubro_id: string;
+          mes: string;
+          monto: number;
+          pagado_el?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          monto?: number;
+          pagado_el?: string;
           updated_at?: string;
         };
         Relationships: [];

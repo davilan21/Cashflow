@@ -34,6 +34,7 @@ export function RubroSheet({
   const [desde, setDesde] = useState(inicial?.desde ?? mesActual);
   const [puntual, setPuntual] = useState(Boolean(inicial && inicial.hasta === inicial.desde));
   const [hasta, setHasta] = useState(inicial?.hasta && inicial.hasta !== inicial.desde ? inicial.hasta : "");
+  const [diaPago, setDiaPago] = useState(inicial?.dia_pago ? String(inicial.dia_pago) : "");
   const [error, setError] = useState<string | null>(null);
   const [confirmandoBorrar, setConfirmandoBorrar] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -61,8 +62,14 @@ export function RubroSheet({
       setError("El mes final no puede ser antes del inicial.");
       return null;
     }
+    const dia = diaPago.trim() === "" ? null : Number(diaPago);
+    if (tipo === "fijo" && dia !== null && !(Number.isInteger(dia) && dia >= 1 && dia <= 31)) {
+      setError("El día de pago va de 1 a 31.");
+      return null;
+    }
     setError(null);
-    return { tipo, nombre: nombre.trim(), monto_default: n, desde, hasta: hastaFinal };
+    // La base exige dia_pago null en ingresos (plan_rubros_dia_pago_solo_fijos).
+    return { tipo, nombre: nombre.trim(), monto_default: n, desde, hasta: hastaFinal, dia_pago: tipo === "fijo" ? dia : null };
   };
 
   const guardar = () => {
@@ -96,6 +103,13 @@ export function RubroSheet({
 
       <label htmlFor="rubro-monto" className={etiqueta}>Monto por mes</label>
       <input id="rubro-monto" inputMode="numeric" value={monto} onChange={(e) => setMonto(formatearMiles(e.target.value))} onKeyDown={(e) => e.key === "Enter" && guardar()} className={`${campo} num text-[20px]`} />
+
+      {tipo === "fijo" && (
+        <>
+          <label htmlFor="rubro-dia" className={etiqueta}>Día de pago (opcional)</label>
+          <input id="rubro-dia" inputMode="numeric" value={diaPago} onChange={(e) => setDiaPago(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="10" className={campo} />
+        </>
+      )}
 
       <label htmlFor="rubro-desde" className={etiqueta}>Desde</label>
       <input id="rubro-desde" type="month" value={desde} onChange={(e) => setDesde(e.target.value)} className={campo} />

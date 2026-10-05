@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { rangoMeses, rubroAplica, lineasDe, estadoCiclo, totalCiclo, promedioCiclosCerrados, calcularTC, calcularPlan } from "./calculo";
-import type { PlanRubro, PlanAjuste, Expense } from "@/lib/types";
+import type { PlanRubro, PlanAjuste, Expense, PlanPago } from "@/lib/types";
 
 // Fábricas: solo lo que importa para el cálculo; el resto es relleno fijo.
 export function rubro(p: Partial<PlanRubro> & Pick<PlanRubro, "id" | "tipo" | "monto_default" | "desde">): PlanRubro {
@@ -8,6 +8,7 @@ export function rubro(p: Partial<PlanRubro> & Pick<PlanRubro, "id" | "tipo" | "m
     cuenta_id: "c1",
     nombre: p.id,
     hasta: null,
+    dia_pago: null,
     orden: 0,
     created_by: null,
     created_at: "",
@@ -18,6 +19,10 @@ export function rubro(p: Partial<PlanRubro> & Pick<PlanRubro, "id" | "tipo" | "m
 
 export function ajuste(mes: string, rubro_id: string | null, monto: number): PlanAjuste {
   return { id: `${mes}-${rubro_id ?? "tc"}`, cuenta_id: "c1", mes, rubro_id, monto, updated_at: "" };
+}
+
+export function pago(mes: string, rubro_id: string, monto: number, pagado_el = `${mes}-05`): PlanPago {
+  return { id: `${mes}-${rubro_id}-p`, cuenta_id: "c1", rubro_id, mes, monto, pagado_el, created_by: null, created_at: "", updated_at: "" };
 }
 
 function gasto(fecha: string, monto: number): Expense {
@@ -277,5 +282,49 @@ describe("calcularPlan", () => {
     expect(nov.ahorro).toBeNull();
     expect(nov.acumulado).toBe(oct.acumulado);
     expect(dic.acumulado).toBe(nov.acumulado! + dic.ahorro!);
+  });
+});
+
+describe("lineasDe con pagos", () => {
+  const rubros = [
+    rubro({ id: "luz", tipo: "fijo", monto_default: 150_000, desde: "2026-01" }),
+    rubro({ id: "nomina", tipo: "ingreso", monto_default: 10_000_000, desde: "2026-01" }),
+  ];
+
+  it("prioridad: pago > ajuste > default, y estimado guarda lo que habría sin el pago", () => {
+    const ajustes = [ajuste("2026-10", "luz", 170_000)];
+    const [l] = lineasDe(rubros, ajustes, "2026-10", "fijo", [pago("2026-10", "luz", 182_000, "2026-10-08")]);
+    expect(l).toMatchObject({ monto: 182_000, estimado: 170_000, ajustado: true, pagado: { monto: 182_000, pagadoEl: "2026-10-08" } });
+  });
+
+  it("sin pago: monto = estimado y pagado null", () => {
+    const [l] = lineasDe(rubros, [], "2026-10", "fijo", []);
+    expect(l).toMatchObject({ monto: 150_000, estimado: 150_000, pagado: null });
+  });
+
+  it("un pago de otro mes no aplica", () => {
+    const [l] = lineasDe(rubros, [], "2026-11", "fijo", [pago("2026-10", "luz", 182_000)]);
+    expect(l.pagado).toBeNull();
+  });
+
+  it("un pago colgado de un ingreso se ignora", () => {
+    const [l] = lineasDe(rubros, [], "2026-10", "ingreso", [pago("2026-10", "nomina", 1)]);
+    expect(l).toMatchObject({ monto: 10_000_000, pagado: null });
+  });
+});
+
+describe("calcularPlan con pagos", () => {
+  it("el ahorro usa el monto pagado; desmarcar (sin pago) vuelve al estimado", () => {
+    const rubros = [
+      rubro({ id: "nomina", tipo: "ingreso", monto_default: 10_000_000, desde: "2026-01" }),
+      rubro({ id: "luz", tipo: "fijo", monto_default: 150_000, desde: "2026-01" }),
+    ];
+    const hoy = "2026-10-10";
+    const con = calcularPlan({ rubros, ajustes: [], gastos: [], hoy, pagos: [pago("2026-10", "luz", 200_000)] });
+    const sin = calcularPlan({ rubros, ajustes: [], gastos: [], hoy, pagos: [] });
+    const oct = (p: typeof con) => p.find((m) => m.mes === "2026-10")!;
+    expect(oct(con).totalFijos).toBe(200_000);
+    expect(oct(sin).totalFijos).toBe(150_000);
+    expect(oct(con).ahorro! - oct(sin).ahorro!).toBe(-50_000);
   });
 });

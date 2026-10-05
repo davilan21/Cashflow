@@ -51,6 +51,7 @@ Supabase y ejecuta, en orden, el contenido de:
 4. `supabase/migrations/0004_gmail_integracion.sql`
 5. `supabase/migrations/0011_plan_mensual.sql`
 6. `supabase/migrations/0012_ahorros.sql`
+7. `supabase/migrations/0013_pagos_fijos.sql`
 
 Los números 0005–0010 están reservados por la rama de Flujo de caja (sin
 mergear); 0011 y 0012 se eligieron para no colisionar. `/ahorros` no carga

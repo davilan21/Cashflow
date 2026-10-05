@@ -2,6 +2,7 @@
 
 import { pesos } from "@/lib/money";
 import { etiquetaOrigenTC } from "@/lib/plan/etiquetas";
+import { etiquetaFechaCorta } from "@/lib/pagos/etiquetas";
 import type { LineaPlan, MesPlan } from "@/lib/plan/calculo";
 import { IconoLapiz } from "@/components/ui/Iconos";
 import { textoAhorro, colorAhorro } from "./ResumenMes";
@@ -50,9 +51,19 @@ function Bloque({ titulo, lineas, total, onEditar }: { titulo: string; lineas: L
         <span className="num">{pesos(total)}</span>
       </div>
       {lineas.length === 0 && <div className="text-[13px] text-muted py-2.5">Sin {titulo.toLowerCase()} este mes.</div>}
-      {lineas.map((l) => (
-        <Linea key={l.rubroId} nombre={l.nombre} monto={l.monto} ajustado={l.ajustado} onClick={() => onEditar(l.rubroId)} />
-      ))}
+      {lineas.map((l) =>
+        l.pagado ? (
+          <Linea
+            key={l.rubroId}
+            nombre={`✓ ${l.nombre}`}
+            detalle={`pagado el ${etiquetaFechaCorta(l.pagado.pagadoEl)}${l.monto !== l.estimado ? ` · estimado ${pesos(l.estimado)}` : ""}`}
+            monto={l.monto}
+            ajustado={false}
+          />
+        ) : (
+          <Linea key={l.rubroId} nombre={l.nombre} monto={l.monto} ajustado={l.ajustado} onClick={() => onEditar(l.rubroId)} />
+        )
+      )}
     </div>
   );
 }

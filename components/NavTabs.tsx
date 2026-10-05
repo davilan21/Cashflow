@@ -7,6 +7,7 @@ import { IconoEngranaje } from "@/components/ui/Iconos";
 const TABS = [
   { href: "/registro", label: "Registro" },
   { href: "/pendientes", label: "Pendientes" },
+  { href: "/pagos", label: "Pagos" },
   { href: "/historial", label: "Historial" },
   { href: "/plan", label: "Plan" },
   { href: "/ahorros", label: "Ahorros" },
@@ -14,7 +15,7 @@ const TABS = [
   { href: "/cuenta", label: "Cuenta", soloEscritorio: true },
 ] as const;
 
-export function NavTabs({ pendientesCount = 0 }: { pendientesCount?: number }) {
+export function NavTabs({ pendientesCount = 0, pagosCount = 0 }: { pendientesCount?: number; pagosCount?: number }) {
   const pathname = usePathname();
   const enCuenta = pathname.startsWith("/cuenta");
 
@@ -23,19 +24,21 @@ export function NavTabs({ pendientesCount = 0 }: { pendientesCount?: number }) {
       <div className="flex gap-1 bg-[#E4DFEC] p-[3px] rounded-xl flex-1 min-w-0">
         {TABS.map((t) => {
           const activo = pathname.startsWith(t.href);
-          const oculto = "soloEscritorio" in t && t.soloEscritorio ? "hidden lg:block" : "";
+          // La etiqueta se trunca; el contador es hermano que no encoge, así no se corta a 375px.
+          const display = "soloEscritorio" in t && t.soloEscritorio ? "hidden lg:flex" : "flex";
+          const contador = t.href === "/pendientes" ? pendientesCount : t.href === "/pagos" ? pagosCount : 0;
           return (
             <Link
               key={t.href}
               href={t.href}
-              className={`${oculto} flex-1 min-w-0 text-center py-2 rounded-lg text-[13px] lg:text-sm truncate ${
+              className={`${display} flex-1 min-w-0 items-center justify-center py-2 rounded-lg text-[13px] lg:text-sm ${
                 activo ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted"
               }`}
             >
-              {t.label}
-              {t.href === "/pendientes" && pendientesCount > 0 && (
-                <span className="ml-1 inline-block bg-alerta text-white text-[10px] rounded-full px-1.5 leading-4 align-middle">
-                  {pendientesCount}
+              <span className="truncate min-w-0">{t.label}</span>
+              {contador > 0 && (
+                <span className="ml-1 shrink-0 bg-alerta text-white text-[10px] rounded-full px-1.5 leading-4">
+                  {contador}
                 </span>
               )}
             </Link>
