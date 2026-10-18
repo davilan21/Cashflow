@@ -7,6 +7,9 @@ const MESES = [
 const CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
+/** Cómo se nombra cada tarjeta en pantalla. */
+export const NOMBRE_TARJETA = { principal: "Principal", respaldo: "Respaldo ·7095" } as const;
+
 export function etiquetaCiclo(ciclo: string): string {
   const inicio = cicloInicio(ciclo);
   return `16 ${CORTOS[mesNum(inicio) - 1]} – 15 ${CORTOS[mesNum(ciclo) - 1]}`;

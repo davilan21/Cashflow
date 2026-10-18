@@ -19,6 +19,8 @@ const gasto = (over: Partial<Expense>): Expense => ({
   categoria: "restaurantes",
   nota: "almuerzo",
   created_by: "u1",
+  tarjeta: "principal",
+  ref_import: null,
   created_at: "",
   updated_at: "",
   ...over,

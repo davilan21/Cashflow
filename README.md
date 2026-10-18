@@ -52,6 +52,7 @@ Supabase y ejecuta, en orden, el contenido de:
 5. `supabase/migrations/0011_plan_mensual.sql`
 6. `supabase/migrations/0012_ahorros.sql`
 7. `supabase/migrations/0013_pagos_fijos.sql`
+8. `supabase/migrations/0014_tarjeta_respaldo.sql`
 
 Los números 0005–0010 están reservados por la rama de Flujo de caja (sin
 mergear); 0011 y 0012 se eligieron para no colisionar. `/ahorros` no carga
@@ -137,6 +138,23 @@ CRON_SECRET=una-cadena-aleatoria-larga
 `CRON_SECRET` la generas tú (por ejemplo `openssl rand -hex 32`) — protege
 la ruta que dispara la sincronización diaria para que solo Vercel Cron
 pueda llamarla.
+
+## Tarjeta de respaldo (CSV del banco)
+
+Desde el 2026-10-15 se usa una segunda tarjeta (terminada en 7095). Cada gasto
+tiene `tarjeta` (`principal` por defecto, o `respaldo`); Registro e Historial
+muestran el total partido por tarjeta y los topes siguen contra la suma.
+Mientras no lleguen alertas al correo, sus compras se cargan desde el export
+`saldos.csv` del banco:
+
+```bash
+npx vite-node scripts/importar-tarjeta.ts -- saldos.csv            # vista previa
+npx vite-node scripts/importar-tarjeta.ts -- saldos.csv --cuenta <uuid> --autor <uuid> > carga.sql
+```
+
+Solo toma los Debito desde `--desde` (por defecto 2026-10-15); los pagos se
+ignoran. El SQL es idempotente (`ref_import` + índice único), así que el CSV
+acumulado se puede recargar sin duplicar.
 
 ## Migrar datos de una versión anterior (el prototipo)
 

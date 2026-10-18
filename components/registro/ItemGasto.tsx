@@ -1,4 +1,5 @@
 import { pesos } from "@/lib/money";
+import { NOMBRE_TARJETA } from "@/lib/labels";
 import type { Category, Expense } from "@/lib/types";
 
 export function ItemGasto({
@@ -30,6 +31,11 @@ export function ItemGasto({
           {autor && <span className="text-[#8A7FA6]"> · {autor}</span>}
         </span>
       </button>
+      {gasto.tarjeta === "respaldo" && (
+        <span className="text-[10px] text-[#8A5A1F] bg-[#FBF1E4] rounded-full px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+          {NOMBRE_TARJETA.respaldo}
+        </span>
+      )}
       {pendiente && (
         <span className="text-[10px] text-muted border border-line rounded-full px-1.5 py-0.5 shrink-0">pendiente</span>
       )}

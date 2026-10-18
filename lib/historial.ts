@@ -1,5 +1,5 @@
 import { cicloDe, mitadDe, desplazarMes } from "./ciclo";
-import type { Expense } from "./types";
+import type { Expense, Tarjeta } from "./types";
 
 export interface ResumenCiclo {
   ciclo: string;
@@ -7,8 +7,18 @@ export interface ResumenCiclo {
   m1: number;
   m2: number;
   porCategoria: Record<string, number>;
+  porTarjeta: Record<Tarjeta, number>;
   topCategoria: string | null;
   enCurso: boolean;
+}
+
+/** Suma de gastos por tarjeta. La suma de ambas es el total que se compara contra los topes. */
+export function totalesPorTarjeta(gastos: Expense[]): Record<Tarjeta, number> {
+  const t: Record<Tarjeta, number> = { principal: 0, respaldo: 0 };
+  gastos.forEach((g) => {
+    t[g.tarjeta === "respaldo" ? "respaldo" : "principal"] += g.monto;
+  });
+  return t;
 }
 
 /** Un resumen por ciclo desde el primer gasto hasta el ciclo actual, incluyendo ciclos sin movimientos. */
@@ -32,6 +42,7 @@ export function calcularResumenCiclos(gastos: Expense[], cicloHoy: string): Resu
       m1: items.filter((g) => mitadDe(g.fecha) === 1).reduce((s, g) => s + g.monto, 0),
       m2: items.filter((g) => mitadDe(g.fecha) === 2).reduce((s, g) => s + g.monto, 0),
       porCategoria,
+      porTarjeta: totalesPorTarjeta(items),
       topCategoria: top ? top[0] : null,
       enCurso: c === cicloHoy,
     });

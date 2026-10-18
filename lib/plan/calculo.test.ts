@@ -26,7 +26,7 @@ export function pago(mes: string, rubro_id: string, monto: number, pagado_el = `
 }
 
 function gasto(fecha: string, monto: number): Expense {
-  return { id: `${fecha}-${monto}`, cuenta_id: "c1", fecha, monto, categoria: "otros", nota: null, created_by: null, created_at: "", updated_at: "" };
+  return { id: `${fecha}-${monto}`, cuenta_id: "c1", fecha, monto, categoria: "otros", nota: null, created_by: null, tarjeta: "principal", ref_import: null, created_at: "", updated_at: "" };
 }
 
 describe("rangoMeses", () => {

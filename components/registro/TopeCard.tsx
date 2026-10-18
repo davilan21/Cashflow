@@ -1,5 +1,7 @@
 import { pesos, pesosCorto } from "@/lib/money";
 import { BarraTope } from "@/components/ui/BarraTope";
+import { NOMBRE_TARJETA } from "@/lib/labels";
+import type { Tarjeta } from "@/lib/types";
 
 interface ProyeccionQuincena {
   etiqueta: string;
@@ -18,6 +20,7 @@ function lineaQuincena(q: ProyeccionQuincena, topeQuincena: number) {
 
 export function TopeCard({
   total,
+  porTarjeta,
   tope,
   topeQuincena,
   onEditarTopes,
@@ -28,6 +31,7 @@ export function TopeCard({
   quincena2,
 }: {
   total: number;
+  porTarjeta: Record<Tarjeta, number>;
   tope: number;
   topeQuincena: number;
   onEditarTopes: () => void;
@@ -46,6 +50,11 @@ export function TopeCard({
         <div>
           <div className="text-[11px] tracking-wider uppercase text-muted font-semibold mb-1">Va del ciclo</div>
           <div className="text-[32px] font-semibold leading-none num">{pesos(total)}</div>
+          {porTarjeta.respaldo > 0 && (
+            <div className="text-xs text-muted mt-1.5 num">
+              {NOMBRE_TARJETA.principal} {pesos(porTarjeta.principal)} · {NOMBRE_TARJETA.respaldo} {pesos(porTarjeta.respaldo)}
+            </div>
+          )}
         </div>
         <button onClick={onEditarTopes} className="text-right text-muted text-xs bg-transparent border-none cursor-pointer">
           topes{" "}

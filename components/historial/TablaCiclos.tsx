@@ -1,4 +1,4 @@
-import { etiquetaCiclo, textoEstadoCiclo } from "@/lib/labels";
+import { etiquetaCiclo, textoEstadoCiclo, NOMBRE_TARJETA } from "@/lib/labels";
 import { pesos, pesosCorto } from "@/lib/money";
 import type { ResumenCiclo } from "@/lib/historial";
 import type { Category } from "@/lib/types";
@@ -30,6 +30,12 @@ export function TablaCiclos({
                 {textoEstadoCiclo(r.ciclo, r.enCurso)}
                 {r.topCategoria ? ` · más en ${catById(r.topCategoria).nombre.toLowerCase()}` : ""}
               </span>
+              {r.porTarjeta.respaldo > 0 && (
+                <span className="block text-[11px] text-muted mt-0.5 num">
+                  {NOMBRE_TARJETA.principal} {pesosCorto(r.porTarjeta.principal)} · {NOMBRE_TARJETA.respaldo}{" "}
+                  {pesosCorto(r.porTarjeta.respaldo)}
+                </span>
+              )}
             </span>
             <span className="text-[15px] num">{pesos(r.total)}</span>
             {!r.enCurso && (

@@ -26,6 +26,9 @@ export interface Settings {
   updated_at: string;
 }
 
+/** Tarjeta a la que pertenece un gasto. "respaldo" es la terminada en 7095, en uso desde el 2026-10-15. */
+export type Tarjeta = "principal" | "respaldo";
+
 export interface Expense {
   id: string;
   cuenta_id: string;
@@ -34,6 +37,8 @@ export interface Expense {
   categoria: string;
   nota: string | null;
   created_by: string | null; // quién lo registró (atribución)
+  tarjeta: Tarjeta;
+  ref_import: string | null; // huella del CSV del banco; null si no vino de una importación
   created_at: string;
   updated_at: string;
 }
@@ -234,6 +239,8 @@ export interface Database {
           categoria: string;
           nota?: string | null;
           created_by?: string | null;
+          tarjeta?: Tarjeta;
+          ref_import?: string | null;
           created_at?: string;
           updated_at?: string;
         };
