@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcularResumenCiclos, calcularRubros } from "./historial";
+import { calcularResumenCiclos, calcularRubros, totalesPorTarjeta } from "./historial";
 import type { Expense } from "./types";
 
 const g = (over: Partial<Expense>): Expense => ({
@@ -10,6 +10,8 @@ const g = (over: Partial<Expense>): Expense => ({
   categoria: "otros",
   nota: null,
   created_by: "u1",
+  tarjeta: "principal",
+  ref_import: null,
   created_at: "",
   updated_at: "",
   ...over,
@@ -76,5 +78,31 @@ describe("calcularRubros", () => {
     const actual = calcularResumenCiclos([g({ fecha: "2026-08-01", monto: 1500, categoria: "mercado" })], "2026-08");
     const rubros = calcularRubros(actual, previa);
     expect(rubros[0].delta).toBe(50);
+  });
+});
+
+describe("totalesPorTarjeta", () => {
+  it("separa principal y respaldo, y el total sigue siendo la suma", () => {
+    const t = totalesPorTarjeta([
+      g({ monto: 1000 }),
+      g({ monto: 500, tarjeta: "respaldo" }),
+      g({ monto: 250, tarjeta: "respaldo" }),
+    ]);
+    expect(t).toEqual({ principal: 1000, respaldo: 750 });
+  });
+
+  it("ceros si no hay gastos", () => {
+    expect(totalesPorTarjeta([])).toEqual({ principal: 0, respaldo: 0 });
+  });
+});
+
+describe("calcularResumenCiclos por tarjeta", () => {
+  it("cada ciclo trae su desglose por tarjeta", () => {
+    const r = calcularResumenCiclos(
+      [g({ fecha: "2026-10-16", monto: 300, tarjeta: "respaldo" }), g({ fecha: "2026-10-20", monto: 700 })],
+      "2026-11"
+    );
+    expect(r[0].ciclo).toBe("2026-11");
+    expect(r[0].porTarjeta).toEqual({ principal: 700, respaldo: 300 });
   });
 });

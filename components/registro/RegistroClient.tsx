@@ -21,6 +21,7 @@ import {
   hoyISO,
 } from "@/lib/ciclo";
 import { pesos } from "@/lib/money";
+import { totalesPorTarjeta } from "@/lib/historial";
 import type { Category, Expense, Miembro, NuevoGasto, Settings } from "@/lib/types";
 
 import { CicloHeader } from "./CicloHeader";
@@ -126,6 +127,7 @@ export function RegistroClient({
     [gastos, ciclo]
   );
   const total = delCiclo.reduce((s, g) => s + g.monto, 0);
+  const porTarjeta = useMemo(() => totalesPorTarjeta(delCiclo), [delCiclo]);
   const m1 = delCiclo.filter((g) => mitadDe(g.fecha) === 1);
   const m2 = delCiclo.filter((g) => mitadDe(g.fecha) === 2);
   const totalM1 = m1.reduce((s, g) => s + g.monto, 0);
@@ -252,6 +254,7 @@ export function RegistroClient({
 
       <TopeCard
         total={total}
+        porTarjeta={porTarjeta}
         tope={settings.tope_ciclo}
         topeQuincena={settings.tope_quincena}
         onEditarTopes={() => setEditandoTopes(true)}

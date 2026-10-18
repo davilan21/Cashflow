@@ -58,6 +58,8 @@ describe("filtrarNuevos", () => {
     categoria: "restaurantes",
     nota: "almuerzo",
     created_by: "u1",
+    tarjeta: "principal",
+    ref_import: null,
     created_at: "",
     updated_at: "",
   };

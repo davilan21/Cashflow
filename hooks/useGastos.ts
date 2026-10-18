@@ -77,6 +77,8 @@ export function useGastos(opts: {
         categoria: gasto.categoria,
         nota: gasto.nota,
         created_by: userId,
+        tarjeta: "principal",
+        ref_import: null,
         created_at: ahora,
         updated_at: ahora,
       };
