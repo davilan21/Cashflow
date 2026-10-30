@@ -5,18 +5,25 @@ import { refrescarToken } from "./oauth";
 import { listarIdsMensajes, obtenerMensaje } from "./gmailApi";
 import { extraerTextoPlano, parsearNotificacionConClaude, parsearNotificacionLocal } from "./parse";
 
-// Bancolombia manda notificaciones de tarjeta desde al menos estos dos
-// remitentes (confirmado leyendo correos reales): uno para pagos programados,
-// otro para compras normales del día a día — este segundo es, en la práctica,
-// el que produce el volumen real (ver lib/gmail/parse.ts para el detalle de
-// formato de cada uno).
-const REMITENTES_BANCOLOMBIA = ["alertasynotificaciones@bancolombia.com.co", "alertasynotificaciones@an.notificacionesbancolombia.com"];
+// Bancolombia manda las notificaciones de tarjeta desde varios subdominios de
+// notificacionesbancolombia.com ("an.", y desde oct-2026 también "ayn.", sin
+// aviso) y desde bancolombia.com.co para pagos programados. Se filtra por
+// dominio, no por dirección exacta: en Gmail `from:dominio` cubre también sus
+// subdominios, así que un subdominio nuevo no se pierde en silencio. Ver
+// lib/gmail/parse.ts para el formato de cada correo.
+const REMITENTES_BANCOLOMBIA = ["notificacionesbancolombia.com", "alertasynotificaciones@bancolombia.com.co"];
 const DIAS_BACKFILL = 30;
 
 /** Punto de corte para buscar correos: la última sync, o N días atrás si nunca ha sincronizado. */
 export function calcularDesde(ultimoSyncAt: string | null, diasBackfill: number, ahora: Date = new Date()): Date {
   if (!ultimoSyncAt) return new Date(ahora.getTime() - diasBackfill * 24 * 60 * 60 * 1000);
   return new Date(ultimoSyncAt);
+}
+
+/** Búsqueda de Gmail: correos de los remitentes de Bancolombia desde `desde`. */
+export function construirQueryGmail(desde: Date): string {
+  const remitentes = REMITENTES_BANCOLOMBIA.map((r) => `from:${r}`).join(" OR ");
+  return `(${remitentes}) after:${Math.floor(desde.getTime() / 1000)}`;
 }
 
 async function parsearNotificacion(texto: string) {
@@ -50,8 +57,7 @@ export async function sincronizarGmail(
   if (!miembro) return { error: "sin_cuenta" };
 
   const desde = calcularDesde(conexion.ultimo_sync_at, DIAS_BACKFILL);
-  const remitentes = REMITENTES_BANCOLOMBIA.map((r) => `from:${r}`).join(" OR ");
-  const query = `(${remitentes}) after:${Math.floor(desde.getTime() / 1000)}`;
+  const query = construirQueryGmail(desde);
 
   try {
     const ids = await listarIdsMensajes(accessToken, query);
