@@ -1,4 +1,4 @@
-import { aDate, diaDe, mesNum, cicloInicio, cicloPago, diasEnMes, hoyISO } from "./ciclo";
+import { aDate, desplazarMes, diaDe, mesNum, cicloInicio, cicloPago, diasEnMes, hoyISO } from "./ciclo";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -12,7 +12,18 @@ export const NOMBRE_TARJETA = { principal: "Principal", respaldo: "Respaldo ·70
 
 export function etiquetaCiclo(ciclo: string): string {
   const inicio = cicloInicio(ciclo);
-  return `16 ${CORTOS[mesNum(inicio) - 1]} – 15 ${CORTOS[mesNum(ciclo) - 1]}`;
+  return `15 ${CORTOS[mesNum(inicio) - 1]} – 14 ${CORTOS[mesNum(ciclo) - 1]}`;
+}
+
+/** Primera mitad del ciclo: del 15 al fin del mes anterior al de cierre. P. ej. "15–31 jul". */
+export function etiquetaMitad1(ciclo: string): string {
+  const mesPrev = desplazarMes(ciclo, -1);
+  return `15–${diasEnMes(mesPrev)} ${CORTOS[mesNum(mesPrev) - 1]}`;
+}
+
+/** Segunda mitad del ciclo: del 1 al 14 del mes de cierre. P. ej. "1–14 ago". */
+export function etiquetaMitad2(ciclo: string): string {
+  return `1–14 ${CORTOS[mesNum(ciclo) - 1]}`;
 }
 
 export function etiquetaPago(ciclo: string): string {

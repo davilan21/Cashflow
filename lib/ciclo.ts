@@ -1,7 +1,12 @@
 /**
- * El ciclo de la tarjeta va del 16 de un mes al 15 del siguiente y se paga
+ * El ciclo de la tarjeta va del 15 de un mes al 14 del siguiente y se paga
  * el día 2 del mes posterior al cierre. El ciclo se identifica por su mes de
- * cierre: '2026-08' significa 16 jul – 15 ago, se paga el 2 de septiembre.
+ * cierre: '2026-08' significa 15 jul – 14 ago, se paga el 2 de septiembre.
+ *
+ * El banco corta el 15, pero las compras de ese día se facturan en el extracto
+ * siguiente y las del 15 del mes anterior entran en este (verificado contra el
+ * extracto de la VISA "15 sep - 15 oct 2026": sus 111 compras van del 15 de
+ * septiembre al 14 de octubre y suman el "Compras del mes" al peso).
  *
  * Todas las fechas son strings 'YYYY-MM-DD' y toda la aritmética de mes
  * usa enteros (año*12 + mes) en vez de Date, para no depender de la zona
@@ -52,21 +57,21 @@ export function diasEnMes(ym: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
-/** A qué ciclo pertenece una fecha. '2026-07-20' -> '2026-08'; '2026-08-03' -> '2026-08'. */
+/** A qué ciclo pertenece una fecha. '2026-07-20' -> '2026-08'; '2026-08-03' -> '2026-08'; '2026-08-15' -> '2026-09'. */
 export function cicloDe(fecha: string): string {
   const { y, m, d } = partesFecha(fecha);
   const ym = `${y}-${pad(m)}`;
-  return d <= 15 ? ym : desplazarMes(ym, 1);
+  return d < 15 ? ym : desplazarMes(ym, 1);
 }
 
-/** Primer día del ciclo (el 16 del mes anterior al de cierre). */
+/** Primer día del ciclo (el 15 del mes anterior al de cierre). */
 export function cicloInicio(ciclo: string): string {
-  return `${desplazarMes(ciclo, -1)}-16`;
+  return `${desplazarMes(ciclo, -1)}-15`;
 }
 
-/** Último día del ciclo (el 15 del mes de cierre). */
+/** Último día del ciclo (el 14 del mes de cierre). */
 export function cicloFin(ciclo: string): string {
-  return `${ciclo}-15`;
+  return `${ciclo}-14`;
 }
 
 /** Fecha de pago: el 2 del mes siguiente al de cierre. */
@@ -74,12 +79,12 @@ export function cicloPago(ciclo: string): string {
   return `${desplazarMes(ciclo, 1)}-02`;
 }
 
-/** Mitad del ciclo a la que pertenece una fecha: 1 = 16 al fin de mes, 2 = 1 al 15. */
+/** Mitad del ciclo a la que pertenece una fecha: 1 = 15 al fin de mes, 2 = 1 al 14. */
 export function mitadDe(fecha: string): 1 | 2 {
-  return partesFecha(fecha).d >= 16 ? 1 : 2;
+  return partesFecha(fecha).d >= 15 ? 1 : 2;
 }
 
-/** Último día de la primera mitad del ciclo (16 al fin del mes anterior al de cierre). */
+/** Último día de la primera mitad del ciclo (15 al fin del mes anterior al de cierre). */
 export function mitad1Fin(ciclo: string): string {
   const mesPrev = desplazarMes(ciclo, -1);
   return `${mesPrev}-${pad(diasEnMes(mesPrev))}`;

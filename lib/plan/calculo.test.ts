@@ -98,16 +98,16 @@ describe("estadoCiclo", () => {
     expect(estadoCiclo("2026-09", "2026-09-10")).toBe("en_curso");
     expect(estadoCiclo("2026-10", "2026-09-10")).toBe("no_iniciado");
   });
-  it("bordes: el 15 sigue en curso, el 16 arranca el siguiente", () => {
-    expect(estadoCiclo("2026-09", "2026-09-15")).toBe("en_curso");
-    expect(estadoCiclo("2026-09", "2026-09-16")).toBe("cerrado");
-    expect(estadoCiclo("2026-10", "2026-09-16")).toBe("en_curso");
+  it("bordes: el 14 sigue en curso, el 15 arranca el siguiente", () => {
+    expect(estadoCiclo("2026-09", "2026-09-14")).toBe("en_curso");
+    expect(estadoCiclo("2026-09", "2026-09-15")).toBe("cerrado");
+    expect(estadoCiclo("2026-10", "2026-09-15")).toBe("en_curso");
   });
 });
 
 describe("totalCiclo", () => {
-  it("15-sep entra a septiembre, 16-sep a octubre", () => {
-    const g = [gasto("2026-08-16", 100), gasto("2026-09-15", 200), gasto("2026-09-16", 400)];
+  it("14-sep entra a septiembre, 15-sep a octubre", () => {
+    const g = [gasto("2026-08-15", 100), gasto("2026-09-14", 200), gasto("2026-09-15", 400)];
     expect(totalCiclo(g, "2026-09")).toBe(300);
     expect(totalCiclo(g, "2026-10")).toBe(400);
   });
@@ -134,24 +134,30 @@ describe("promedioCiclosCerrados", () => {
 });
 
 describe("calcularTC: la factura se paga el mes siguiente al cierre", () => {
-  // Caso real: el ciclo que cerró el 15-sep se paga el 2-oct. Octubre debe
-  // cargar esa factura, no el ciclo 16-sep..15-oct que se paga en noviembre.
+  // Caso real: el ciclo que cerró el 14-sep se paga el 2-oct. Octubre debe
+  // cargar esa factura, no el ciclo 15-sep..14-oct que se paga en noviembre.
   const hoy = "2026-10-02";
   const gastos = [
-    gasto("2026-08-20", 1_000_000), // ciclo 09 (16-ago..15-sep)
+    gasto("2026-08-20", 1_000_000), // ciclo 09 (15-ago..14-sep)
     gasto("2026-09-10", 2_000_000), // ciclo 09
-    gasto("2026-09-20", 600_000),   // ciclo 10 (16-sep..15-oct, en curso)
+    gasto("2026-09-20", 600_000),   // ciclo 10 (15-sep..14-oct, en curso)
   ];
 
-  it("octubre = factura exacta del ciclo que cerró el 15-sep", () => {
+  it("octubre = factura exacta del ciclo que cerró el 14-sep", () => {
     expect(calcularTC(gastos, [], "2026-10", hoy)).toMatchObject({ monto: 3_000_000, origen: "real", editable: false, ciclo: "2026-09" });
   });
 
-  it("noviembre = ritmo del ciclo en curso (16-sep..15-oct)", () => {
-    // 30 días de ciclo; corridos al 2-oct = 17
+  it("noviembre = ritmo del ciclo en curso (15-sep..14-oct)", () => {
+    // 30 días de ciclo; corridos al 2-oct = 18
     const tc = calcularTC(gastos, [], "2026-11", hoy);
     expect(tc).toMatchObject({ origen: "ritmo", editable: true, ciclo: "2026-10" });
-    expect(tc.monto).toBe(Math.round((600_000 / 17) * 30));
+    expect(tc.monto).toBe(Math.round((600_000 / 18) * 30));
+  });
+
+  it("el 14-sep cierra la factura que se paga en octubre y el 15-sep abre la siguiente", () => {
+    const g = [...gastos, gasto("2026-09-14", 500_000), gasto("2026-09-15", 700_000)];
+    expect(calcularTC(g, [], "2026-10", hoy)).toMatchObject({ monto: 3_500_000, origen: "real", ciclo: "2026-09" });
+    expect(calcularTC(g, [], "2026-11", hoy).monto).toBe(Math.round(((600_000 + 700_000) / 18) * 30));
   });
 
   it("diciembre = promedio (su ciclo todavía no arranca)", () => {
@@ -176,18 +182,18 @@ describe("calcularTC", () => {
   });
 
   it("ciclo en curso: real + ritmo sobre el largo del ciclo", () => {
-    // mes 11 paga el ciclo 2026-10: 16-sep..15-oct = 30 días; corridos al 20-sep = 5
+    // mes 11 paga el ciclo 2026-10: 15-sep..14-oct = 30 días; corridos al 20-sep = 6
     const tc = calcularTC(gastos, [], "2026-11", hoy);
     expect(tc.origen).toBe("ritmo");
     expect(tc.editable).toBe(true);
-    expect(tc.monto).toBe(Math.round((500_000 / 5) * 30));
+    expect(tc.monto).toBe(Math.round((500_000 / 6) * 30));
     expect(tc.referencia).toBe(tc.monto);
   });
 
   it("ciclo en curso con ajuste: manual, y la referencia sigue siendo el ritmo", () => {
     const tc = calcularTC(gastos, [ajuste("2026-11", null, 4_000_000)], "2026-11", hoy);
     expect(tc).toMatchObject({ monto: 4_000_000, origen: "manual", editable: true });
-    expect(tc.referencia).toBe(Math.round((500_000 / 5) * 30));
+    expect(tc.referencia).toBe(Math.round((500_000 / 6) * 30));
   });
 
   it("mes 12 (ciclo 11 no iniciado): promedio de los 3 cerrados (07, 08, 09)", () => {

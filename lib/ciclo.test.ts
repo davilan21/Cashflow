@@ -21,43 +21,80 @@ import {
 } from "./ciclo";
 
 describe("cicloDe", () => {
-  it("una fecha en la segunda mitad del mes pertenece al ciclo que cierra ese mismo mes", () => {
-    expect(cicloDe("2026-08-03")).toBe("2026-08");
+  it("una fecha del 1 al 14 pertenece al ciclo que cierra ese mismo mes", () => {
     expect(cicloDe("2026-08-01")).toBe("2026-08");
+    expect(cicloDe("2026-08-03")).toBe("2026-08");
+    expect(cicloDe("2026-08-14")).toBe("2026-08");
   });
 
-  it("una fecha en la primera mitad del mes pertenece al ciclo que cierra el mes siguiente", () => {
+  it("una fecha del 15 en adelante pertenece al ciclo que cierra el mes siguiente", () => {
+    expect(cicloDe("2026-07-15")).toBe("2026-08");
     expect(cicloDe("2026-07-20")).toBe("2026-08");
-    expect(cicloDe("2026-07-16")).toBe("2026-08");
+    expect(cicloDe("2026-01-31")).toBe("2026-02");
   });
 
-  it("el día 15 exacto cae en el ciclo que cierra ese mes", () => {
-    expect(cicloDe("2026-07-15")).toBe("2026-07");
-  });
-
-  it("el día 16 exacto cae en el ciclo del mes siguiente", () => {
-    expect(cicloDe("2026-07-16")).toBe("2026-08");
+  // Extracto de la VISA (periodo "15 sep - 15 oct 2026"): las compras del 15 de
+  // septiembre se facturan en él, y las del 15 de octubre pasan al siguiente.
+  it("el día 15 abre el ciclo y el 14 lo cierra (extracto VISA oct-2026)", () => {
+    expect(cicloDe("2026-09-14")).toBe("2026-09");
+    expect(cicloDe("2026-09-15")).toBe("2026-10");
+    expect(cicloDe("2026-10-14")).toBe("2026-10");
+    expect(cicloDe("2026-10-15")).toBe("2026-11");
   });
 
   it("cruza el cambio de año", () => {
+    expect(cicloDe("2026-12-14")).toBe("2026-12");
+    expect(cicloDe("2026-12-15")).toBe("2027-01");
     expect(cicloDe("2026-12-20")).toBe("2027-01");
-    expect(cicloDe("2026-12-15")).toBe("2026-12");
+  });
+
+  it("las funciones del ciclo concuerdan entre sí: cada día cae entre el inicio y el fin de su ciclo", () => {
+    for (let fecha = "2026-01-01"; fecha <= "2027-12-31"; fecha = sumarDias(fecha, 1)) {
+      const ciclo = cicloDe(fecha);
+      expect(cicloInicio(ciclo) <= fecha && fecha <= cicloFin(ciclo)).toBe(true);
+      expect(mitadDe(fecha) === 1 ? fecha >= cicloInicio(ciclo) && fecha <= mitad1Fin(ciclo) : fecha >= mitad2Inicio(ciclo) && fecha <= cicloFin(ciclo)).toBe(true);
+    }
+  });
+});
+
+describe("el umbral del ciclo", () => {
+  // Este es el test que fija el 15: el ciclo cambia exactamente el día 15 de cada
+  // mes. Con un corte en el 16 (la regla vieja) o en cualquier otro día, falla.
+  it("el ciclo cambia exactamente cuando el día del mes es 15, ni antes ni después", () => {
+    for (let fecha = "2026-01-01"; fecha < "2028-12-31"; fecha = sumarDias(fecha, 1)) {
+      const manana = sumarDias(fecha, 1);
+      expect(cicloDe(manana) !== cicloDe(fecha)).toBe(diaDe(manana) === 15);
+    }
+  });
+
+  it("cada ciclo empieza un 15, termina un 14 y el siguiente arranca al día siguiente (sin huecos ni solapes)", () => {
+    for (let ciclo = "2026-01"; ciclo <= "2028-12"; ciclo = desplazarMes(ciclo, 1)) {
+      expect(diaDe(cicloInicio(ciclo))).toBe(15);
+      expect(diaDe(cicloFin(ciclo))).toBe(14);
+      expect(sumarDias(cicloFin(ciclo), 1)).toBe(cicloInicio(desplazarMes(ciclo, 1)));
+    }
+  });
+
+  it("año bisiesto: el 14 y el 15 de febrero de 2028 y el 29 de febrero", () => {
+    expect(cicloDe("2028-02-14")).toBe("2028-02");
+    expect(cicloDe("2028-02-29")).toBe("2028-03");
+    expect(mitad1Fin("2028-03")).toBe("2028-02-29");
   });
 });
 
 describe("cicloInicio", () => {
-  it("empieza el 16 del mes anterior", () => {
-    expect(cicloInicio("2026-08")).toBe("2026-07-16");
+  it("empieza el 15 del mes anterior", () => {
+    expect(cicloInicio("2026-08")).toBe("2026-07-15");
   });
 
   it("cruza el cambio de año hacia atrás", () => {
-    expect(cicloInicio("2027-01")).toBe("2026-12-16");
+    expect(cicloInicio("2027-01")).toBe("2026-12-15");
   });
 });
 
 describe("cicloFin", () => {
-  it("termina el 15 del mes de cierre", () => {
-    expect(cicloFin("2026-08")).toBe("2026-08-15");
+  it("termina el 14 del mes de cierre", () => {
+    expect(cicloFin("2026-08")).toBe("2026-08-14");
   });
 });
 
@@ -72,13 +109,13 @@ describe("cicloPago", () => {
 });
 
 describe("mitadDe", () => {
-  it("día >= 16 es la primera mitad (1)", () => {
-    expect(mitadDe("2026-08-16")).toBe(1);
+  it("día >= 15 es la primera mitad (1)", () => {
+    expect(mitadDe("2026-08-15")).toBe(1);
     expect(mitadDe("2026-08-31")).toBe(1);
   });
 
-  it("día <= 15 es la segunda mitad (2)", () => {
-    expect(mitadDe("2026-08-15")).toBe(2);
+  it("día <= 14 es la segunda mitad (2)", () => {
+    expect(mitadDe("2026-08-14")).toBe(2);
     expect(mitadDe("2026-08-01")).toBe(2);
   });
 });
@@ -95,10 +132,10 @@ describe("mitad1Fin / mitad2Inicio", () => {
 
   it("las dos mitades cubren el ciclo completo sin huecos ni solapes", () => {
     const ciclo = "2026-08";
-    expect(cicloInicio(ciclo)).toBe("2026-07-16");
+    expect(cicloInicio(ciclo)).toBe("2026-07-15");
     expect(mitad1Fin(ciclo)).toBe("2026-07-31");
     expect(mitad2Inicio(ciclo)).toBe("2026-08-01");
-    expect(cicloFin(ciclo)).toBe("2026-08-15");
+    expect(cicloFin(ciclo)).toBe("2026-08-14");
   });
 });
 
@@ -118,10 +155,10 @@ describe("diasCorridosEnRango", () => {
   });
 });
 
-describe("un gasto del 16 y otro del 14 del mes siguiente caen en el mismo ciclo", () => {
-  it("2026-07-16 y 2026-08-14 comparten ciclo", () => {
-    expect(cicloDe("2026-07-16")).toBe(cicloDe("2026-08-14"));
-    expect(cicloDe("2026-07-16")).toBe("2026-08");
+describe("un gasto del 15 y otro del 14 del mes siguiente caen en el mismo ciclo", () => {
+  it("2026-07-15 y 2026-08-14 comparten ciclo", () => {
+    expect(cicloDe("2026-07-15")).toBe(cicloDe("2026-08-14"));
+    expect(cicloDe("2026-07-15")).toBe("2026-08");
   });
 });
 

@@ -1,5 +1,7 @@
 # Plan mensual — plan de implementación
 
+> **Nota (2026-11-10):** el ciclo de la tarjeta pasó de 16–15 a **15–14** (las compras del día 15 se facturan en el extracto siguiente). Este documento describe la regla vieja; la vigente está en `lib/ciclo.ts`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Una pestaña **Plan** que cruza ingresos y gastos fijos recurrentes con la factura de tarjeta de cada ciclo para mostrar el ahorro de cada mes y el acumulado hacia adelante, con montos editables mes a mes.

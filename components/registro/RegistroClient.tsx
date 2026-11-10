@@ -15,11 +15,10 @@ import {
   mitad2Inicio,
   diasCorridosEnRango,
   desplazarMes,
-  diasEnMes,
   diasEntre,
-  mesNum,
   hoyISO,
 } from "@/lib/ciclo";
+import { etiquetaMitad1, etiquetaMitad2 } from "@/lib/labels";
 import { pesos } from "@/lib/money";
 import { totalesPorTarjeta } from "@/lib/historial";
 import type { Category, Expense, Miembro, NuevoGasto, Settings } from "@/lib/types";
@@ -38,7 +37,6 @@ import { Banner } from "@/components/ui/Banner";
 import { Toast } from "@/components/ui/Toast";
 
 const CATEGORIA_VACIA: Category = { id: "otros", nombre: "Otros", color: "#6B6F76", orden: 99, cuenta_id: null };
-const CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 export function RegistroClient({
   userId,
@@ -120,7 +118,6 @@ export function RegistroClient({
   const cicloHoy = cicloDe(hoy);
   const esCicloActual = cicloHoy === ciclo;
   const haySiguiente = ciclo < cicloHoy;
-  const mesPrev = desplazarMes(ciclo, -1);
 
   const delCiclo = useMemo(
     () => gastos.filter((g) => cicloDe(g.fecha) === ciclo).sort((a, b) => b.fecha.localeCompare(a.fecha)),
@@ -140,8 +137,8 @@ export function RegistroClient({
   const restantes = Math.max(0, largo - corridos);
   const proyeccion = corridos > 0 ? (total / corridos) * largo : 0;
 
-  const etiquetaM1 = `16–${diasEnMes(mesPrev)} ${CORTOS[mesNum(mesPrev) - 1]}`;
-  const etiquetaM2 = `1–15 ${CORTOS[mesNum(ciclo) - 1]}`;
+  const etiquetaM1 = etiquetaMitad1(ciclo);
+  const etiquetaM2 = etiquetaMitad2(ciclo);
 
   // Proyección por quincena, igual que la del ciclo completo pero acotada a
   // cada mitad — para la alerta de "a este ritmo" discriminada por quincena.

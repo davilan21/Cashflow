@@ -1,5 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { etiquetaPago, textoEstadoCiclo } from "./labels";
+import { etiquetaCiclo, etiquetaMitad1, etiquetaMitad2, etiquetaPago, textoEstadoCiclo } from "./labels";
+
+describe("etiquetaCiclo", () => {
+  it("va del 15 del mes anterior al 14 del mes de cierre", () => {
+    expect(etiquetaCiclo("2026-08")).toBe("15 jul – 14 ago");
+  });
+
+  it("cruza el cambio de año", () => {
+    expect(etiquetaCiclo("2027-01")).toBe("15 dic – 14 ene");
+  });
+});
+
+describe("etiquetas de quincena", () => {
+  it("la primera mitad va del 15 al fin del mes anterior al de cierre", () => {
+    expect(etiquetaMitad1("2026-08")).toBe("15–31 jul");
+    expect(etiquetaMitad1("2026-03")).toBe("15–28 feb");
+    expect(etiquetaMitad1("2028-03")).toBe("15–29 feb");
+  });
+
+  it("la segunda mitad va del 1 al 14 del mes de cierre", () => {
+    expect(etiquetaMitad2("2026-08")).toBe("1–14 ago");
+  });
+});
 
 describe("etiquetaPago", () => {
   it("nombra el mes del pago, no el del cierre", () => {

@@ -45,12 +45,19 @@ describe("armarCSV", () => {
     const csv = armarCSV([gasto({ fecha: "2026-08-01" })], () => "Restaurantes y domicilios");
     const [encabezado, fila] = csv.split("\n");
     expect(encabezado).toBe("fecha,ciclo,quincena,categoria,nota,monto");
-    expect(fila).toBe('2026-08-01,2026-08,1-15,Restaurantes y domicilios,"almuerzo",200000');
+    expect(fila).toBe('2026-08-01,2026-08,1-14,Restaurantes y domicilios,"almuerzo",200000');
   });
 
-  it("marca la quincena 16-fin para la primera mitad del ciclo", () => {
+  it("marca la quincena 15-fin para la primera mitad del ciclo", () => {
     const csv = armarCSV([gasto({ fecha: "2026-07-20" })], () => "x");
-    expect(csv.split("\n")[1]).toContain(",16-fin,");
+    expect(csv.split("\n")[1]).toContain(",15-fin,");
+  });
+
+  it("el día 15 abre la primera mitad y el 14 cierra la segunda", () => {
+    const csv = armarCSV([gasto({ fecha: "2026-07-14" }), gasto({ fecha: "2026-07-15" })], () => "x");
+    const [, dia14, dia15] = csv.split("\n");
+    expect(dia14).toContain(",2026-07,1-14,");
+    expect(dia15).toContain(",2026-08,15-fin,");
   });
 
   it("escapa comillas dobles en la nota", () => {
