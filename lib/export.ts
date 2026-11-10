@@ -26,7 +26,7 @@ export function armarCSV(gastos: Expense[], nombreCategoria: (id: string) => str
       [
         g.fecha,
         cicloDe(g.fecha),
-        mitadDe(g.fecha) === 1 ? "16-fin" : "1-15",
+        mitadDe(g.fecha) === 1 ? "15-fin" : "1-14",
         nombreCategoria(g.categoria),
         `"${(g.nota ?? "").replace(/"/g, "'")}"`,
         g.monto,
