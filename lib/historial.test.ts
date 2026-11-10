@@ -40,7 +40,7 @@ describe("calcularResumenCiclos", () => {
     expect(r[1].enCurso).toBe(false);
   });
 
-  it("separa m1 (16 al fin) y m2 (1 al 15) y calcula la categoría con más gasto", () => {
+  it("separa m1 (15 al fin) y m2 (1 al 14) y calcula la categoría con más gasto", () => {
     const gastos = [
       g({ fecha: "2026-07-20", monto: 100000, categoria: "mercado" }), // m1 del ciclo 2026-08
       g({ fecha: "2026-08-05", monto: 30000, categoria: "transporte" }), // m2
@@ -53,8 +53,15 @@ describe("calcularResumenCiclos", () => {
     expect(r.topCategoria).toBe("mercado");
   });
 
-  it("un gasto del 16 y otro del 14 del mes siguiente caen en el mismo resumen de ciclo", () => {
-    const gastos = [g({ fecha: "2026-07-16", monto: 1000 }), g({ fecha: "2026-08-14", monto: 2000 })];
+  it("el día 14 cierra la segunda mitad de un ciclo y el 15 abre la primera del siguiente", () => {
+    const gastos = [g({ fecha: "2026-08-14", monto: 100 }), g({ fecha: "2026-08-15", monto: 200 })];
+    const r = calcularResumenCiclos(gastos, "2026-09");
+    expect(r.find((x) => x.ciclo === "2026-08")).toMatchObject({ m1: 0, m2: 100, total: 100 });
+    expect(r.find((x) => x.ciclo === "2026-09")).toMatchObject({ m1: 200, m2: 0, total: 200 });
+  });
+
+  it("un gasto del 15 y otro del 14 del mes siguiente caen en el mismo resumen de ciclo", () => {
+    const gastos = [g({ fecha: "2026-07-15", monto: 1000 }), g({ fecha: "2026-08-14", monto: 2000 })];
     const r = calcularResumenCiclos(gastos, "2026-08");
     expect(r).toHaveLength(1);
     expect(r[0].total).toBe(3000);

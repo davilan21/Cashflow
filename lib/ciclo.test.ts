@@ -48,12 +48,37 @@ describe("cicloDe", () => {
     expect(cicloDe("2026-12-20")).toBe("2027-01");
   });
 
-  it("todas las funciones del ciclo concuerdan: cada día cae entre el inicio y el fin de su ciclo", () => {
+  it("las funciones del ciclo concuerdan entre sí: cada día cae entre el inicio y el fin de su ciclo", () => {
     for (let fecha = "2026-01-01"; fecha <= "2027-12-31"; fecha = sumarDias(fecha, 1)) {
       const ciclo = cicloDe(fecha);
       expect(cicloInicio(ciclo) <= fecha && fecha <= cicloFin(ciclo)).toBe(true);
       expect(mitadDe(fecha) === 1 ? fecha >= cicloInicio(ciclo) && fecha <= mitad1Fin(ciclo) : fecha >= mitad2Inicio(ciclo) && fecha <= cicloFin(ciclo)).toBe(true);
     }
+  });
+});
+
+describe("el umbral del ciclo", () => {
+  // Este es el test que fija el 15: el ciclo cambia exactamente el día 15 de cada
+  // mes. Con un corte en el 16 (la regla vieja) o en cualquier otro día, falla.
+  it("el ciclo cambia exactamente cuando el día del mes es 15, ni antes ni después", () => {
+    for (let fecha = "2026-01-01"; fecha < "2028-12-31"; fecha = sumarDias(fecha, 1)) {
+      const manana = sumarDias(fecha, 1);
+      expect(cicloDe(manana) !== cicloDe(fecha)).toBe(diaDe(manana) === 15);
+    }
+  });
+
+  it("cada ciclo empieza un 15, termina un 14 y el siguiente arranca al día siguiente (sin huecos ni solapes)", () => {
+    for (let ciclo = "2026-01"; ciclo <= "2028-12"; ciclo = desplazarMes(ciclo, 1)) {
+      expect(diaDe(cicloInicio(ciclo))).toBe(15);
+      expect(diaDe(cicloFin(ciclo))).toBe(14);
+      expect(sumarDias(cicloFin(ciclo), 1)).toBe(cicloInicio(desplazarMes(ciclo, 1)));
+    }
+  });
+
+  it("año bisiesto: el 14 y el 15 de febrero de 2028 y el 29 de febrero", () => {
+    expect(cicloDe("2028-02-14")).toBe("2028-02");
+    expect(cicloDe("2028-02-29")).toBe("2028-03");
+    expect(mitad1Fin("2028-03")).toBe("2028-02-29");
   });
 });
 

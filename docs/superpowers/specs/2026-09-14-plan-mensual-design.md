@@ -1,5 +1,7 @@
 # Plan mensual — ingresos, gastos y ahorro proyectado
 
+> **Nota (2026-11-10):** el ciclo de la tarjeta pasó de 16–15 a **15–14** (las compras del día 15 se facturan en el extracto siguiente). Este documento describe la regla vieja; la vigente está en `lib/ciclo.ts`.
+
 Fecha: 2026-09-14
 
 ## Objetivo

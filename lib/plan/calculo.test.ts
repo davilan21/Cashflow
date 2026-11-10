@@ -154,6 +154,12 @@ describe("calcularTC: la factura se paga el mes siguiente al cierre", () => {
     expect(tc.monto).toBe(Math.round((600_000 / 18) * 30));
   });
 
+  it("el 14-sep cierra la factura que se paga en octubre y el 15-sep abre la siguiente", () => {
+    const g = [...gastos, gasto("2026-09-14", 500_000), gasto("2026-09-15", 700_000)];
+    expect(calcularTC(g, [], "2026-10", hoy)).toMatchObject({ monto: 3_500_000, origen: "real", ciclo: "2026-09" });
+    expect(calcularTC(g, [], "2026-11", hoy).monto).toBe(Math.round(((600_000 + 700_000) / 18) * 30));
+  });
+
   it("diciembre = promedio (su ciclo todavía no arranca)", () => {
     expect(calcularTC(gastos, [], "2026-12", hoy)).toMatchObject({ monto: 3_000_000, origen: "promedio", ciclo: "2026-11" });
   });

@@ -15,6 +15,7 @@ describe("etiquetas de quincena", () => {
   it("la primera mitad va del 15 al fin del mes anterior al de cierre", () => {
     expect(etiquetaMitad1("2026-08")).toBe("15–31 jul");
     expect(etiquetaMitad1("2026-03")).toBe("15–28 feb");
+    expect(etiquetaMitad1("2028-03")).toBe("15–29 feb");
   });
 
   it("la segunda mitad va del 1 al 14 del mes de cierre", () => {
